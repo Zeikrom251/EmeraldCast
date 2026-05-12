@@ -1,3 +1,8 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
 # Logs
 logs
 *.log
@@ -65,8 +70,7 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variable files
-.env
+# dotenv environment variable files (keep .env.example)
 .env.*
 !.env.example
 
@@ -127,6 +131,9 @@ dist
 
 # pnpm
 .pnpm-store
+
+# Turborepo
+.turbo/
 
 # yarn v3
 .pnp.*
