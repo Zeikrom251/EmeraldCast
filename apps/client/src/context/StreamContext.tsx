@@ -23,6 +23,7 @@ export interface StreamContextValue extends StreamState {
   toggleMuteAll: () => void
   setVolume: (volume: number) => void
   toggleAllNativeMode: () => void
+  toggleNativeMode: (id: string) => void
 }
 
 export const StreamContext = createContext<StreamContextValue | null>(null)

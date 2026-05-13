@@ -14,6 +14,7 @@ type StreamAction =
   | { type: 'TOGGLE_MUTE_ALL' }
   | { type: 'SET_VOLUME'; volume: number }
   | { type: 'TOGGLE_ALL_NATIVE_MODE' }
+  | { type: 'TOGGLE_NATIVE_MODE'; id: string }
   | { type: 'LOAD_STREAMS'; streams: StreamSlot[] }
 
 function makeId(): string {
@@ -26,7 +27,7 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
       const channel = action.channel.toLowerCase().trim()
       if (!channel || state.streams.some((s) => s.channel === channel)) return state
       const id = makeId()
-      const slot: StreamSlot = { id, channel, muted: false, focused: false }
+      const slot: StreamSlot = { id, channel, muted: false, focused: false, nativeMode: false }
       const streams = [...state.streams, slot]
       const audioFocusId = state.audioFocusId ?? id
       return { ...state, streams, audioFocusId }
@@ -68,8 +69,21 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
       return { ...state, audioFocusId: action.id }
     case 'TOGGLE_MUTE_ALL':
       return { ...state, masterMuted: !state.masterMuted }
-    case 'TOGGLE_ALL_NATIVE_MODE':
-      return { ...state, nativeModeAll: !state.nativeModeAll }
+    case 'TOGGLE_ALL_NATIVE_MODE': {
+      const next = !state.nativeModeAll
+      return {
+        ...state,
+        nativeModeAll: next,
+        streams: state.streams.map((s) => ({ ...s, nativeMode: next })),
+      }
+    }
+    case 'TOGGLE_NATIVE_MODE':
+      return {
+        ...state,
+        streams: state.streams.map((s) =>
+          s.id === action.id ? { ...s, nativeMode: !s.nativeMode } : s
+        ),
+      }
     case 'SET_VOLUME':
       return { ...state, masterVolume: Math.max(0, Math.min(100, action.volume)) }
     case 'LOAD_STREAMS': {
@@ -79,7 +93,11 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
             ? state.audioFocusId
             : action.streams[0].id
           : null
-      return { ...state, streams: action.streams, audioFocusId }
+      return {
+        ...state,
+        streams: action.streams.map((s) => ({ ...s, nativeMode: s.nativeMode ?? false })),
+        audioFocusId,
+      }
     }
     default:
       return state
@@ -115,6 +133,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
         channel: ch.toLowerCase().trim(),
         muted: false,
         focused: false,
+        nativeMode: false,
       }))
       dispatch({ type: 'LOAD_STREAMS', streams })
     } else {
@@ -152,6 +171,10 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   const toggleMuteAll = useCallback(() => dispatch({ type: 'TOGGLE_MUTE_ALL' }), [])
   const setVolume = useCallback((volume: number) => dispatch({ type: 'SET_VOLUME', volume }), [])
   const toggleAllNativeMode = useCallback(() => dispatch({ type: 'TOGGLE_ALL_NATIVE_MODE' }), [])
+  const toggleNativeMode = useCallback(
+    (id: string) => dispatch({ type: 'TOGGLE_NATIVE_MODE', id }),
+    []
+  )
 
   return (
     <StreamContext.Provider
@@ -167,6 +190,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
         toggleMuteAll,
         setVolume,
         toggleAllNativeMode,
+        toggleNativeMode,
       }}
     >
       {children}

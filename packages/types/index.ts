@@ -52,4 +52,5 @@ export interface StreamSlot {
   channel: string
   muted: boolean
   focused: boolean
+  nativeMode: boolean
 }
