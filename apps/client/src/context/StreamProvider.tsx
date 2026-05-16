@@ -1,5 +1,5 @@
 import { useReducer, useEffect, useCallback, type ReactNode } from 'react'
-import type { StreamSlot } from '@repo/types'
+import type { StreamSlot, LayoutType } from '@repo/types'
 import { getActiveStreams, saveActiveStreams } from '@repo/utils'
 import { StreamContext, type StreamState } from './StreamContext'
 
@@ -15,6 +15,7 @@ type StreamAction =
   | { type: 'SET_VOLUME'; volume: number }
   | { type: 'TOGGLE_ALL_NATIVE_MODE' }
   | { type: 'TOGGLE_NATIVE_MODE'; id: string }
+  | { type: 'SET_LAYOUT'; layout: LayoutType }
   | { type: 'LOAD_STREAMS'; streams: StreamSlot[] }
 
 function makeId(): string {
@@ -84,6 +85,8 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
           s.id === action.id ? { ...s, nativeMode: !s.nativeMode } : s
         ),
       }
+    case 'SET_LAYOUT':
+      return { ...state, layoutType: action.layout }
     case 'SET_VOLUME':
       return { ...state, masterVolume: Math.max(0, Math.min(100, action.volume)) }
     case 'LOAD_STREAMS': {
@@ -116,6 +119,7 @@ function getInitialState(): StreamState {
     masterMuted: false,
     masterVolume: 50,
     nativeModeAll: false,
+    layoutType: 'grid',
   }
 }
 
@@ -175,6 +179,10 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     (id: string) => dispatch({ type: 'TOGGLE_NATIVE_MODE', id }),
     []
   )
+  const setLayout = useCallback(
+    (layout: LayoutType) => dispatch({ type: 'SET_LAYOUT', layout }),
+    []
+  )
 
   return (
     <StreamContext.Provider
@@ -191,6 +199,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
         setVolume,
         toggleAllNativeMode,
         toggleNativeMode,
+        setLayout,
       }}
     >
       {children}

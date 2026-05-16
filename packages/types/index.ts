@@ -54,3 +54,5 @@ export interface StreamSlot {
   focused: boolean
   nativeMode: boolean
 }
+
+export type LayoutType = 'grid' | 'main-sidebar' | 'focus'

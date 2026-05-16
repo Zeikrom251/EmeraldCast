@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { StreamSlot } from '@repo/types'
+import type { StreamSlot, LayoutType } from '@repo/types'
 
 export interface StreamState {
   streams: StreamSlot[]
@@ -10,6 +10,7 @@ export interface StreamState {
   masterMuted: boolean
   masterVolume: number
   nativeModeAll: boolean
+  layoutType: LayoutType
 }
 
 export interface StreamContextValue extends StreamState {
@@ -24,6 +25,7 @@ export interface StreamContextValue extends StreamState {
   setVolume: (volume: number) => void
   toggleAllNativeMode: () => void
   toggleNativeMode: (id: string) => void
+  setLayout: (layout: LayoutType) => void
 }
 
 export const StreamContext = createContext<StreamContextValue | null>(null)
