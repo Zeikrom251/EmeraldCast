@@ -6,7 +6,7 @@
     "dev": "nest start --watch",
     "build": "nest build",
     "lint": "eslint src --ext ts",
-    "start": "node dist/src/main.js",
+    "start": "node dist/main.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage"
