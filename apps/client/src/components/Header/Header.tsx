@@ -37,7 +37,7 @@ export function Header() {
           {nativeModeAll ? 'EmeraldCast Mode' : 'Twitch Mode'}
         </button>
         <a
-          href="https://github.com"
+          href="https://github.com/Zeikrom251/EmeraldCast"
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-md p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
