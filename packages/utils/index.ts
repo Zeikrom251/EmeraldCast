@@ -1,1 +1,1 @@
-export { getSavedLayouts, saveLayout, deleteLayout, getActiveStreams, saveActiveStreams } from './storage'
+export { getActiveStreams, saveActiveStreams } from './storage'
