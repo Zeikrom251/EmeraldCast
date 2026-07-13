@@ -2,20 +2,12 @@ import { Injectable, Logger, InternalServerErrorException, OnModuleInit } from '
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import axios, { AxiosInstance } from 'axios'
-import type { TwitchSearchResult, TwitchStream, FollowedChannel } from '@repo/types'
+import type { TwitchSearchResult, FollowedChannel } from '@repo/types'
 
 interface TwitchTokenResponse {
   access_token: string
   expires_in: number
   token_type: string
-}
-
-interface TwitchHelixUser {
-  id: string
-  login: string
-  display_name: string
-  profile_image_url: string
-  description: string
 }
 
 interface TwitchHelixStream {
@@ -55,9 +47,14 @@ interface TwitchHelixUserToken {
   profile_image_url: string
 }
 
-export interface FollowedChannelsPayload {
-  username: string
-  channels: FollowedChannel[]
+const HELIX_PAGE_SIZE = 100
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size))
+  }
+  return chunks
 }
 
 @Injectable()
@@ -144,15 +141,8 @@ export class TwitchService implements OnModuleInit {
 
       const viewerCountMap = new Map<string, number>()
       if (liveLogins.length > 0) {
-        const streamsParams = new URLSearchParams()
-        liveLogins.forEach((login) => streamsParams.append('user_login', login))
-        streamsParams.append('first', '100')
-
-        const { data: streamsData } = await this.helix.get<{ data: TwitchHelixStream[] }>(
-          '/streams',
-          { params: streamsParams }
-        )
-        for (const stream of streamsData.data) {
+        const streams = await this.fetchStreamsByLogin(this.helix, liveLogins)
+        for (const stream of streams) {
           viewerCountMap.set(stream.user_login.toLowerCase(), stream.viewer_count)
         }
       }
@@ -169,58 +159,6 @@ export class TwitchService implements OnModuleInit {
     } catch (err) {
       this.logger.error('searchChannels failed', err)
       throw new InternalServerErrorException('Failed to search Twitch channels')
-    }
-  }
-
-  async getStreams(channels: string[]): Promise<TwitchStream[]> {
-    await this.ensureToken()
-
-    if (channels.length === 0) return []
-
-    const safeChannels = channels.slice(0, 100)
-
-    try {
-      const params = new URLSearchParams()
-      safeChannels.forEach((ch) => params.append('user_login', ch.toLowerCase()))
-      params.append('first', '100')
-
-      const { data: streamsData } = await this.helix.get<{ data: TwitchHelixStream[] }>(
-        '/streams',
-        { params }
-      )
-
-      const usersParams = new URLSearchParams()
-      safeChannels.forEach((ch) => usersParams.append('login', ch.toLowerCase()))
-
-      const { data: usersData } = await this.helix.get<{ data: TwitchHelixUser[] }>('/users', {
-        params: usersParams,
-      })
-
-      const userMap = new Map(usersData.data.map((u) => [u.login.toLowerCase(), u]))
-      const liveMap = new Map(streamsData.data.map((s) => [s.user_login.toLowerCase(), s]))
-
-      return safeChannels.map((ch) => {
-        const login = ch.toLowerCase()
-        const user = userMap.get(login)
-        const stream = liveMap.get(login)
-
-        return {
-          id: stream?.id ?? user?.id ?? login,
-          userId: user?.id ?? '',
-          userLogin: login,
-          userName: user?.display_name ?? ch,
-          gameId: stream?.game_id ?? '',
-          gameName: stream?.game_name ?? '',
-          title: stream?.title ?? '',
-          viewerCount: stream?.viewer_count ?? 0,
-          startedAt: stream?.started_at ?? '',
-          thumbnailUrl: stream?.thumbnail_url ?? '',
-          isLive: Boolean(stream),
-        }
-      })
-    } catch (err) {
-      this.logger.error('getStreams failed', err)
-      throw new InternalServerErrorException('Failed to fetch Twitch stream data')
     }
   }
 
@@ -265,6 +203,37 @@ export class TwitchService implements OnModuleInit {
     return this.jwt.sign({ username, channels, userToken: userAccessToken })
   }
 
+  private async fetchStreamsByLogin(
+    client: AxiosInstance,
+    logins: string[]
+  ): Promise<TwitchHelixStream[]> {
+    const batches = await Promise.all(
+      chunk(logins, HELIX_PAGE_SIZE).map(async (batch) => {
+        const params = new URLSearchParams()
+        batch.forEach((login) => params.append('user_login', login))
+        params.append('first', String(HELIX_PAGE_SIZE))
+        const { data } = await client.get<{ data: TwitchHelixStream[] }>('/streams', { params })
+        return data.data
+      })
+    )
+    return batches.flat()
+  }
+
+  private async fetchUsersByLogin(
+    client: AxiosInstance,
+    logins: string[]
+  ): Promise<TwitchHelixUserToken[]> {
+    const batches = await Promise.all(
+      chunk(logins, HELIX_PAGE_SIZE).map(async (batch) => {
+        const params = new URLSearchParams()
+        batch.forEach((login) => params.append('login', login))
+        const { data } = await client.get<{ data: TwitchHelixUserToken[] }>('/users', { params })
+        return data.data
+      })
+    )
+    return batches.flat()
+  }
+
   private async fetchFollowedChannels(
     userToken: string
   ): Promise<{ username: string; channels: FollowedChannel[] }> {
@@ -285,7 +254,7 @@ export class TwitchService implements OnModuleInit {
     let cursor: string | undefined
 
     do {
-      const params: Record<string, string | number> = { user_id: me.id, first: 100 }
+      const params: Record<string, string | number> = { user_id: me.id, first: HELIX_PAGE_SIZE }
       if (cursor) params.after = cursor
 
       const { data: followData } = await userHelix.get<{
@@ -297,33 +266,14 @@ export class TwitchService implements OnModuleInit {
       cursor = followData.pagination?.cursor
     } while (cursor)
 
-    const liveMap = new Map<string, { viewer_count: number; title: string }>()
-    for (let i = 0; i < followed.length; i += 100) {
-      const batch = followed.slice(i, i + 100)
-      const sp = new URLSearchParams()
-      batch.forEach((ch) => sp.append('user_login', ch.broadcaster_login))
-      sp.append('first', '100')
+    const logins = followed.map((ch) => ch.broadcaster_login)
+    const [streams, users] = await Promise.all([
+      this.fetchStreamsByLogin(userHelix, logins),
+      this.fetchUsersByLogin(userHelix, logins),
+    ])
 
-      const { data: streamsData } = await userHelix.get<{ data: TwitchHelixStream[] }>('/streams', {
-        params: sp,
-      })
-      for (const s of streamsData.data) {
-        liveMap.set(s.user_login.toLowerCase(), { viewer_count: s.viewer_count, title: s.title })
-      }
-    }
-
-    const profileMap = new Map<string, string>()
-    for (let i = 0; i < followed.length; i += 100) {
-      const batch = followed.slice(i, i + 100)
-      const up = new URLSearchParams()
-      batch.forEach((ch) => up.append('login', ch.broadcaster_login))
-      const { data: usersData } = await userHelix.get<{ data: TwitchHelixUserToken[] }>('/users', {
-        params: up,
-      })
-      for (const u of usersData.data) {
-        profileMap.set(u.login.toLowerCase(), u.profile_image_url)
-      }
-    }
+    const liveMap = new Map(streams.map((s) => [s.user_login.toLowerCase(), s]))
+    const profileMap = new Map(users.map((u) => [u.login.toLowerCase(), u.profile_image_url]))
 
     const channels: FollowedChannel[] = followed.map((ch) => {
       const login = ch.broadcaster_login.toLowerCase()

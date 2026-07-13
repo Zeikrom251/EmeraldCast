@@ -6,10 +6,3 @@ export class SearchQueryDto {
   @MaxLength(100)
   q!: string
 }
-
-export class StreamsQueryDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(500)
-  channels!: string
-}

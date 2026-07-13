@@ -9,7 +9,7 @@ describe('TwitchController', () => {
 
   const mockService = {
     searchChannels: jest.fn().mockResolvedValue([]),
-    getStreams: jest.fn().mockResolvedValue([]),
+    refreshFollowedChannels: jest.fn().mockResolvedValue([]),
   }
 
   beforeEach(async () => {
@@ -32,8 +32,12 @@ describe('TwitchController', () => {
     expect(service.searchChannels).toHaveBeenCalledWith('shroud')
   })
 
-  it('getStreams splits comma-separated channels', async () => {
-    await controller.getStreams({ channels: 'shroud,ninja' })
-    expect(service.getStreams).toHaveBeenCalledWith(['shroud', 'ninja'])
+  it('getFollowed rejects a missing bearer token', async () => {
+    await expect(controller.getFollowed('')).rejects.toThrow('Missing token')
+  })
+
+  it('getFollowed delegates the bearer token to the service', async () => {
+    await controller.getFollowed('Bearer abc123')
+    expect(service.refreshFollowedChannels).toHaveBeenCalledWith('abc123')
   })
 })

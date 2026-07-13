@@ -1,7 +1,7 @@
 import { Controller, Get, Query, Redirect, BadRequestException, Headers } from '@nestjs/common'
 import { TwitchService } from './twitch.service'
-import { SearchQueryDto, StreamsQueryDto } from './dto/twitch-query.dto'
-import type { TwitchSearchResult, TwitchStream } from '@repo/types'
+import { SearchQueryDto } from './dto/twitch-query.dto'
+import type { TwitchSearchResult } from '@repo/types'
 import { ConfigService } from '@nestjs/config'
 
 @Controller('twitch')
@@ -14,15 +14,6 @@ export class TwitchController {
   @Get('search')
   searchChannels(@Query() query: SearchQueryDto): Promise<TwitchSearchResult[]> {
     return this.twitchService.searchChannels(query.q)
-  }
-
-  @Get('streams')
-  getStreams(@Query() query: StreamsQueryDto): Promise<TwitchStream[]> {
-    const channels = query.channels
-      .split(',')
-      .map((c) => c.trim())
-      .filter(Boolean)
-    return this.twitchService.getStreams(channels)
   }
 
   @Get('followed')
