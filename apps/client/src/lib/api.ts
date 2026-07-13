@@ -1,4 +1,4 @@
-import type { TwitchSearchResult, TwitchStream, FollowedChannel } from '@repo/types'
+import type { TwitchSearchResult, FollowedChannel } from '@repo/types'
 import axios, { type AxiosRequestConfig } from 'axios'
 
 const baseURL = import.meta.env.VITE_API_URL ?? ''
@@ -15,12 +15,8 @@ async function get<T>(path: string, cfg?: AxiosRequestConfig): Promise<T> {
 
 export const api = {
   twitch: {
-    search: (q: string) => get<TwitchSearchResult[]>(`/api/twitch/search`, { params: { q } }),
-
-    streams: (channels: string[]) =>
-      get<TwitchStream[]>(`/api/twitch/streams`, {
-        params: { channels: channels.join(',') },
-      }),
+    search: (q: string, signal?: AbortSignal) =>
+      get<TwitchSearchResult[]>(`/api/twitch/search`, { params: { q }, signal }),
 
     followed: (userToken: string) =>
       get<FollowedChannel[]>(`/api/twitch/followed`, {
