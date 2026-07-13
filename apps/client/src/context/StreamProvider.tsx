@@ -1,5 +1,5 @@
-import { useReducer, useEffect, useCallback, type ReactNode } from 'react'
-import type { StreamSlot, LayoutType } from '@repo/types'
+import { useReducer, useEffect, useMemo, useCallback, type ReactNode } from 'react'
+import type { StreamSlot } from '@repo/types'
 import { getActiveStreams, saveActiveStreams } from '@repo/utils'
 import { StreamContext, type StreamState } from './StreamContext'
 
@@ -11,11 +11,8 @@ type StreamAction =
   | { type: 'TOGGLE_CHAT' }
   | { type: 'SET_CHAT_CHANNEL'; channel: string | null }
   | { type: 'SET_AUDIO_FOCUS'; id: string | null }
-  | { type: 'TOGGLE_MUTE_ALL' }
-  | { type: 'SET_VOLUME'; volume: number }
   | { type: 'TOGGLE_ALL_NATIVE_MODE' }
   | { type: 'TOGGLE_NATIVE_MODE'; id: string }
-  | { type: 'SET_LAYOUT'; layout: LayoutType }
   | { type: 'LOAD_STREAMS'; streams: StreamSlot[] }
 
 function makeId(): string {
@@ -28,8 +25,7 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
       const channel = action.channel.toLowerCase().trim()
       if (!channel || state.streams.some((s) => s.channel === channel)) return state
       const id = makeId()
-      const slot: StreamSlot = { id, channel, muted: false, focused: false, nativeMode: false }
-      const streams = [...state.streams, slot]
+      const streams = [...state.streams, { id, channel, nativeMode: false }]
       const audioFocusId = state.audioFocusId ?? id
       return { ...state, streams, audioFocusId }
     }
@@ -68,8 +64,6 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
       return { ...state, chatChannel: action.channel }
     case 'SET_AUDIO_FOCUS':
       return { ...state, audioFocusId: action.id }
-    case 'TOGGLE_MUTE_ALL':
-      return { ...state, masterMuted: !state.masterMuted }
     case 'TOGGLE_ALL_NATIVE_MODE': {
       const next = !state.nativeModeAll
       return {
@@ -85,10 +79,6 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
           s.id === action.id ? { ...s, nativeMode: !s.nativeMode } : s
         ),
       }
-    case 'SET_LAYOUT':
-      return { ...state, layoutType: action.layout }
-    case 'SET_VOLUME':
-      return { ...state, masterVolume: Math.max(0, Math.min(100, action.volume)) }
     case 'LOAD_STREAMS': {
       const audioFocusId =
         action.streams.length > 0
@@ -116,10 +106,7 @@ function getInitialState(): StreamState {
     chatOpen: localStorage.getItem(CHAT_OPEN_KEY) === 'true',
     chatChannel: null,
     audioFocusId: null,
-    masterMuted: false,
-    masterVolume: 50,
     nativeModeAll: false,
-    layoutType: 'grid',
   }
 }
 
@@ -131,14 +118,10 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     const urlChannels = params.get('streams')
 
     if (urlChannels) {
-      const channels = urlChannels.split(',').filter(Boolean)
-      const streams: StreamSlot[] = channels.map((ch) => ({
-        id: makeId(),
-        channel: ch.toLowerCase().trim(),
-        muted: false,
-        focused: false,
-        nativeMode: false,
-      }))
+      const streams: StreamSlot[] = urlChannels
+        .split(',')
+        .filter(Boolean)
+        .map((ch) => ({ id: makeId(), channel: ch.toLowerCase().trim(), nativeMode: false }))
       dispatch({ type: 'LOAD_STREAMS', streams })
     } else {
       const saved = getActiveStreams()
@@ -172,37 +155,38 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     (id: string | null) => dispatch({ type: 'SET_AUDIO_FOCUS', id }),
     []
   )
-  const toggleMuteAll = useCallback(() => dispatch({ type: 'TOGGLE_MUTE_ALL' }), [])
-  const setVolume = useCallback((volume: number) => dispatch({ type: 'SET_VOLUME', volume }), [])
   const toggleAllNativeMode = useCallback(() => dispatch({ type: 'TOGGLE_ALL_NATIVE_MODE' }), [])
   const toggleNativeMode = useCallback(
     (id: string) => dispatch({ type: 'TOGGLE_NATIVE_MODE', id }),
     []
   )
-  const setLayout = useCallback(
-    (layout: LayoutType) => dispatch({ type: 'SET_LAYOUT', layout }),
-    []
+
+  const value = useMemo(
+    () => ({
+      ...state,
+      addStream,
+      removeStream,
+      reorderStreams,
+      setMain,
+      toggleChat,
+      setChatChannel,
+      setAudioFocus,
+      toggleAllNativeMode,
+      toggleNativeMode,
+    }),
+    [
+      state,
+      addStream,
+      removeStream,
+      reorderStreams,
+      setMain,
+      toggleChat,
+      setChatChannel,
+      setAudioFocus,
+      toggleAllNativeMode,
+      toggleNativeMode,
+    ]
   )
 
-  return (
-    <StreamContext.Provider
-      value={{
-        ...state,
-        addStream,
-        removeStream,
-        reorderStreams,
-        setMain,
-        toggleChat,
-        setChatChannel,
-        setAudioFocus,
-        toggleMuteAll,
-        setVolume,
-        toggleAllNativeMode,
-        toggleNativeMode,
-        setLayout,
-      }}
-    >
-      {children}
-    </StreamContext.Provider>
-  )
+  return <StreamContext.Provider value={value}>{children}</StreamContext.Provider>
 }
