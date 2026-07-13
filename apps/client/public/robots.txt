@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /callback
+
+Sitemap: https://emeraldcast.vercel.app/sitemap.xml

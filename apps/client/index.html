@@ -2,17 +2,115 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/emeraldcast.png" />
-    <link rel="apple-touch-icon" href="/emeraldcast.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EmeraldCast — Watch multiple Twitch streams</title>
+
+    <title>EmeraldCast — Watch Multiple Twitch Streams at Once</title>
     <meta
       name="description"
-      content="Watch multiple Twitch streams simultaneously in a clean, modern grid layout."
+      content="Free multi-stream viewer for Twitch. Watch several streams side by side, drag-and-drop layouts, per-stream chat and audio focus — no account needed."
     />
+    <link rel="canonical" href="https://emeraldcast.vercel.app/" />
+    <meta name="theme-color" content="#0a0a0b" />
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="EmeraldCast" />
+    <meta property="og:title" content="EmeraldCast — Watch Multiple Twitch Streams at Once" />
+    <meta
+      property="og:description"
+      content="Free multi-stream viewer for Twitch. Watch several streams side by side, drag-and-drop layouts, per-stream chat and audio focus — no account needed."
+    />
+    <meta property="og:url" content="https://emeraldcast.vercel.app/" />
+    <meta property="og:image" content="https://emeraldcast.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="EmeraldCast — Watch Multiple Twitch Streams at Once" />
+    <meta
+      name="twitter:description"
+      content="Free multi-stream viewer for Twitch. Watch several streams side by side with drag-and-drop layouts and per-stream chat."
+    />
+    <meta name="twitter:image" content="https://emeraldcast.vercel.app/og-image.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "EmeraldCast",
+        "url": "https://emeraldcast.vercel.app/",
+        "description": "Free multi-stream viewer for Twitch. Watch several streams side by side, rearrange them with drag-and-drop, and follow any stream's chat — all from a single page.",
+        "applicationCategory": "EntertainmentApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+
+    <style>
+      /* Pre-hydration splash: matches the app theme so first paint is never a white flash */
+      html {
+        background: #0a0a0b;
+      }
+      .prerender {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 2rem;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        color: #f2f2f3;
+        text-align: center;
+      }
+      .prerender h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      .prerender h1 span {
+        color: #10b981;
+      }
+      .prerender p,
+      .prerender li {
+        color: #a8a8b3;
+        font-size: 0.9rem;
+        max-width: 34rem;
+      }
+      .prerender ul {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem 1.25rem;
+        padding: 0;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static content for crawlers without JavaScript; replaced when React mounts -->
+      <div class="prerender">
+        <h1>EMERALD<span>CAST</span> — watch multiple Twitch streams at once</h1>
+        <p>
+          EmeraldCast is a free multi-stream viewer for Twitch. Open as many streams as you want
+          side by side, rearrange them with drag-and-drop, pick which stream plays audio, and pin
+          any stream's chat — no account required.
+        </p>
+        <ul>
+          <li>Multi-stream grid</li>
+          <li>Main + sidebar layout</li>
+          <li>Per-stream chat &amp; audio focus</li>
+          <li>Twitch followed-channels list</li>
+          <li>Shareable stream links</li>
+        </ul>
+        <p>Loading the app…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

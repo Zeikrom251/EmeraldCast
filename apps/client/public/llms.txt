@@ -1,0 +1,20 @@
+# EmeraldCast
+
+> EmeraldCast is a free, browser-based multi-stream viewer for Twitch. It lets you watch
+> several Twitch streams at the same time in one page, with no account or installation
+> required.
+
+## What it does
+
+- Watch multiple Twitch streams side by side in an adjustable grid
+- Switch between a grid layout and a main-stream-with-sidebar layout (resizable)
+- Drag and drop streams to reorder them
+- Choose which stream plays audio; all others stay muted
+- Pin any stream's chat in a side panel
+- Connect a Twitch account (optional) to see followed channels and their live status
+- Share a set of streams via URL, e.g. https://emeraldcast.vercel.app/?streams=channel1,channel2
+
+## Links
+
+- App: https://emeraldcast.vercel.app/
+- Source code: https://github.com/Zeikrom251/EmeraldCast
