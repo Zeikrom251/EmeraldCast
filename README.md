@@ -7,7 +7,7 @@ A multi-stream viewer for Twitch. Watch several streams at once, rearrange them 
 ## Features
 
 - **Multi-stream playback** — open as many Twitch streams as you want side by side
-- **Flexible layouts** — switch between Grid, Main + Sidebar, and Focus modes at any time
+- **Flexible layouts** — switch between Grid and Main + Sidebar (with a resizable sidebar) at any time
 - **Drag-and-drop reordering** — rearrange streams by dragging them within the grid
 - **Per-stream audio focus** — choose which stream plays audio while the rest stay muted
 - **Per-stream chat** — pin the chat of any active stream in a resizable side panel
