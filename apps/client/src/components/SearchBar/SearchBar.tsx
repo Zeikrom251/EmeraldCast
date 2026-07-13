@@ -43,7 +43,7 @@ export function SearchBar() {
 
   return (
     <div ref={containerRef} className="relative w-full max-w-sm">
-      <div className="flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 transition-colors focus-within:border-[var(--accent)]">
+      <div className="flex items-center gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 transition-all focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-glow)]">
         <Search size={16} className="shrink-0 text-[var(--text-muted)]" />
         <input
           ref={inputRef}
@@ -75,7 +75,7 @@ export function SearchBar() {
       {open && (query.trim() || loading) && (
         <ul
           role="listbox"
-          className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] shadow-xl"
+          className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)]/95 shadow-2xl backdrop-blur-md"
         >
           {loading && <li className="px-3 py-2 text-sm text-[var(--text-muted)]">Searching…</li>}
 

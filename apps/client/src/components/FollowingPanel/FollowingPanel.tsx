@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import {
   Loader2,
   Twitch,
@@ -17,7 +17,7 @@ import type { FollowedChannel } from '@repo/types'
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 const LOGIN_URL = `${API_BASE}/api/twitch/auth/login`
 
-function ChannelCard({ ch }: { ch: FollowedChannel }) {
+const ChannelCard = memo(function ChannelCard({ ch }: { ch: FollowedChannel }) {
   const { addStream } = useStream()
 
   return (
@@ -67,20 +67,24 @@ function ChannelCard({ ch }: { ch: FollowedChannel }) {
       )}
     </button>
   )
-}
+})
 
 export function FollowingPanel() {
   const { status, username, channels, setConnecting, disconnect } = useFollowing()
   const [search, setSearch] = useState('')
   const [collapsed, setCollapsed] = useState(false)
 
-  const filtered = channels.filter(
-    (ch) =>
-      ch.broadcasterName.toLowerCase().includes(search.toLowerCase()) ||
-      ch.broadcasterLogin.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = useMemo(() => {
+    const needle = search.toLowerCase()
+    if (!needle) return channels
+    return channels.filter(
+      (ch) =>
+        ch.broadcasterName.toLowerCase().includes(needle) ||
+        ch.broadcasterLogin.includes(needle)
+    )
+  }, [channels, search])
 
-  const liveCount = channels.filter((c) => c.isLive).length
+  const liveCount = useMemo(() => channels.filter((c) => c.isLive).length, [channels])
 
   function handleConnect() {
     setConnecting()
