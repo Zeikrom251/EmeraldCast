@@ -16,11 +16,16 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useState } from 'react'
+import { MonitorPlay } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
 import { useStream } from '../../context/StreamContext'
 import { StreamPlayer } from '../StreamPlayer'
 import { cn } from '../../lib/utils'
 import type { StreamSlot } from '@repo/types'
+
+const SIDEBAR_MIN = 160
+const SIDEBAR_MAX = 560
+const RESIZE_HANDLE_WIDTH = 10
 
 function DragPreview({ channel }: { channel: string }) {
   return (
@@ -37,8 +42,8 @@ function ResizeHandle({ onResizeStart }: { onResizeStart: (startX: number) => vo
         e.preventDefault()
         onResizeStart(e.clientX)
       }}
-      className="group/handle relative flex shrink-0 cursor-col-resize items-center justify-center"
-      style={{ width: 10 }}
+      className="group/handle relative flex h-full shrink-0 cursor-col-resize items-center justify-center"
+      style={{ width: RESIZE_HANDLE_WIDTH }}
       aria-hidden
     >
       <div className="h-full w-0.5 rounded-full bg-[var(--border-default)] transition-colors group-hover/handle:bg-[var(--accent)] group-active/handle:bg-[var(--accent)]" />
@@ -49,26 +54,12 @@ function ResizeHandle({ onResizeStart }: { onResizeStart: (startX: number) => vo
 interface SortablePlayerProps {
   slot: StreamSlot
   isMain: boolean
-  isAnyDragging: boolean
-  isActiveChat?: boolean
+  isActiveChat: boolean
   isAudioFocus?: boolean
-  onChatSelect?: () => void
-  onAudioFocusSelect?: () => void
-  className?: string
   style?: React.CSSProperties
 }
 
-function SortablePlayer({
-  slot,
-  isMain,
-  isAnyDragging,
-  isActiveChat,
-  isAudioFocus,
-  onChatSelect,
-  onAudioFocusSelect,
-  className,
-  style: extraStyle,
-}: SortablePlayerProps) {
+function SortablePlayer({ slot, isMain, isActiveChat, isAudioFocus, style: extraStyle }: SortablePlayerProps) {
   const {
     attributes,
     listeners,
@@ -78,11 +69,37 @@ function SortablePlayer({
     transition,
     isDragging,
   } = useSortable({ id: slot.id })
-  const { removeStream, setMain, masterMuted, masterVolume, audioFocusId, toggleNativeMode } =
-    useStream()
+  const {
+    removeStream,
+    setMain,
+    audioFocusId,
+    toggleNativeMode,
+    chatOpen,
+    chatChannel,
+    setChatChannel,
+    setAudioFocus,
+    toggleChat,
+  } = useStream()
   const nativeTwitchMode = slot.nativeMode
 
-  const effectiveMuted = masterMuted || (audioFocusId !== null && slot.id !== audioFocusId)
+  const muted = audioFocusId !== null && slot.id !== audioFocusId
+
+  const onRemove = useCallback(() => removeStream(slot.id), [removeStream, slot.id])
+  const onSetMain = useCallback(() => setMain(slot.id), [setMain, slot.id])
+  const onNativeModeToggle = useCallback(
+    () => toggleNativeMode(slot.id),
+    [toggleNativeMode, slot.id]
+  )
+  const onAudioFocusSelect = useCallback(() => setAudioFocus(slot.id), [setAudioFocus, slot.id])
+  const onChatSelect = useCallback(() => {
+    if (chatOpen && chatChannel === slot.channel) {
+      toggleChat()
+    } else {
+      setChatChannel(slot.channel)
+      setAudioFocus(slot.id)
+      if (!chatOpen) toggleChat()
+    }
+  }, [chatOpen, chatChannel, slot.channel, slot.id, toggleChat, setChatChannel, setAudioFocus])
 
   const style: React.CSSProperties = isDragging
     ? { opacity: 0, ...extraStyle }
@@ -92,7 +109,7 @@ function SortablePlayer({
     <div
       ref={setNodeRef}
       style={style}
-      className={cn('h-full', className)}
+      className="h-full"
       {...(nativeTwitchMode ? {} : attributes)}
     >
       <StreamPlayer
@@ -102,18 +119,16 @@ function SortablePlayer({
         isActiveChat={isActiveChat}
         isAudioFocus={isAudioFocus}
         nativeTwitchMode={nativeTwitchMode}
-        masterMuted={effectiveMuted}
-        masterVolume={masterVolume}
-        onRemove={() => removeStream(slot.id)}
-        onSetMain={() => setMain(slot.id)}
+        muted={muted}
+        onRemove={onRemove}
+        onSetMain={onSetMain}
         onChatSelect={onChatSelect}
         onAudioFocusSelect={onAudioFocusSelect}
-        onNativeModeToggle={() => toggleNativeMode(slot.id)}
+        onNativeModeToggle={onNativeModeToggle}
         dragHandleRef={nativeTwitchMode || isMain ? undefined : setActivatorNodeRef}
         dragListeners={
           nativeTwitchMode || isMain ? undefined : (listeners as React.HTMLAttributes<HTMLElement>)
         }
-        isDragActive={isAnyDragging}
       />
     </div>
   )
@@ -121,36 +136,16 @@ function SortablePlayer({
 
 function getGridCols(count: number): string {
   if (count === 1) return 'grid-cols-1'
-  if (count === 2) return 'grid-cols-2'
   if (count <= 4) return 'grid-cols-2'
   if (count <= 6) return 'grid-cols-3'
   return 'grid-cols-4'
 }
 
 export function StreamGrid() {
-  const {
-    streams,
-    mainId,
-    chatChannel,
-    chatOpen,
-    audioFocusId,
-    setChatChannel,
-    setAudioFocus,
-    toggleChat,
-    reorderStreams,
-  } = useStream()
+  const { streams, mainId, chatChannel, audioFocusId, reorderStreams } = useStream()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(256)
-
-  function handleChatSelect(slot: StreamSlot) {
-    if (chatOpen && chatChannel === slot.channel) {
-      toggleChat()
-    } else {
-      setChatChannel(slot.channel)
-      setAudioFocus(slot.id)
-      if (!chatOpen) toggleChat()
-    }
-  }
+  const gridRef = useRef<HTMLDivElement>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -175,21 +170,27 @@ export function StreamGrid() {
     setActiveId(null)
   }
 
+  // Resizes by mutating the grid template directly so the players do not
+  // re-render on every mouse move; state is committed once on mouse up.
   function startSidebarResize(startX: number) {
     const startWidth = sidebarWidth
+    let width = startWidth
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
 
     function onMove(e: MouseEvent) {
       // handle is left of sidebar → dragging left increases width
-      const next = Math.max(160, Math.min(560, startWidth + (startX - e.clientX)))
-      setSidebarWidth(next)
+      width = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, startWidth + (startX - e.clientX)))
+      if (gridRef.current) {
+        gridRef.current.style.gridTemplateColumns = `1fr ${RESIZE_HANDLE_WIDTH}px ${width}px`
+      }
     }
     function onUp() {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
+      setSidebarWidth(width)
     }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
@@ -197,20 +198,24 @@ export function StreamGrid() {
 
   if (streams.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-        <p className="text-lg font-medium text-[var(--text-primary)]">No streams yet</p>
-        <p className="text-sm text-[var(--text-muted)]">
-          Search for a Twitch channel above to get started.
-        </p>
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_0_40px_var(--accent-glow)]">
+          <MonitorPlay size={28} className="text-[var(--accent)]" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <p className="text-lg font-semibold text-[var(--text-primary)]">No streams yet</p>
+          <p className="max-w-xs text-sm text-[var(--text-muted)]">
+            Search for a Twitch channel above, or pick one from your followed list to start
+            watching.
+          </p>
+        </div>
       </div>
     )
   }
 
-  const isAnyDragging = activeId !== null
   const activeSlot = activeId ? streams.find((s) => s.id === activeId) : null
 
   const effectiveMainId = mainId && streams.some((s) => s.id === mainId) ? mainId : null
-
   const mainSlot = effectiveMainId ? (streams.find((s) => s.id === effectiveMainId) ?? null) : null
   const sideSlots = effectiveMainId ? streams.filter((s) => s.id !== effectiveMainId) : streams
 
@@ -232,10 +237,11 @@ export function StreamGrid() {
       onDragCancel={handleDragCancel}
     >
       <SortableContext
-        items={isSidebarMode ? sideSlots.map((s) => s.id) : streams.map((s) => s.id)}
+        items={(isSidebarMode ? sideSlots : streams).map((s) => s.id)}
         strategy={isSidebarMode ? verticalListSortingStrategy : rectSortingStrategy}
       >
         <div
+          ref={gridRef}
           className={cn(
             'flex-1 overflow-hidden grid',
             !isSidebarMode && cn('gap-2', getGridCols(streams.length))
@@ -243,7 +249,7 @@ export function StreamGrid() {
           style={
             isSidebarMode
               ? {
-                  gridTemplateColumns: `1fr 10px ${sidebarWidth}px`,
+                  gridTemplateColumns: `1fr ${RESIZE_HANDLE_WIDTH}px ${sidebarWidth}px`,
                   gridTemplateRows: `repeat(${sideRowCount}, minmax(0, 1fr))`,
                   rowGap: '0.5rem',
                 }
@@ -263,11 +269,8 @@ export function StreamGrid() {
                 key={slot.channel}
                 slot={slot}
                 isMain={isMain}
-                isAnyDragging={isAnyDragging}
                 isActiveChat={activeChatChannel === slot.channel}
                 isAudioFocus={streams.length > 1 ? audioFocusId === slot.id : undefined}
-                onChatSelect={() => handleChatSelect(slot)}
-                onAudioFocusSelect={() => setAudioFocus(slot.id)}
                 style={
                   isSidebarMode
                     ? isMain
