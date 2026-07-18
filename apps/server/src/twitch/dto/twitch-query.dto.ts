@@ -22,7 +22,7 @@ export class CategoryStreamsQueryDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(200)
+  @MaxLength(500)
   cursor?: string
 
   // ISO 639-1 language code (e.g. "en", "fr"). Omitted means all languages.
