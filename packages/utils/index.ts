@@ -1,1 +1,8 @@
-export { getActiveStreams, saveActiveStreams } from './storage'
+export {
+  getActiveStreams,
+  saveActiveStreams,
+  getFavoriteCategories,
+  saveFavoriteCategories,
+  getCollections,
+  saveCollections,
+} from './storage'

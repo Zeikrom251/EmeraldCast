@@ -2,7 +2,14 @@ import { Injectable, Logger, InternalServerErrorException, OnModuleInit } from '
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import axios, { AxiosInstance } from 'axios'
-import type { TwitchSearchResult, FollowedChannel } from '@repo/types'
+import type {
+  TwitchSearchResult,
+  FollowedChannel,
+  TwitchCategory,
+  CategoryStreamsPage,
+  CategoryStream,
+  DiscoverData,
+} from '@repo/types'
 
 interface TwitchTokenResponse {
   access_token: string
@@ -45,6 +52,12 @@ interface TwitchHelixUserToken {
   login: string
   display_name: string
   profile_image_url: string
+}
+
+interface TwitchHelixCategory {
+  id: string
+  name: string
+  box_art_url: string
 }
 
 const HELIX_PAGE_SIZE = 100
@@ -159,6 +172,98 @@ export class TwitchService implements OnModuleInit {
     } catch (err) {
       this.logger.error('searchChannels failed', err)
       throw new InternalServerErrorException('Failed to search Twitch channels')
+    }
+  }
+
+  async searchCategories(query: string): Promise<TwitchCategory[]> {
+    await this.ensureToken()
+
+    try {
+      const { data } = await this.helix.get<{ data: TwitchHelixCategory[] }>(
+        '/search/categories',
+        { params: { query, first: 20 } }
+      )
+
+      return data.data.map((c) => ({
+        id: c.id,
+        name: c.name,
+        boxArtUrl: this.normalizeBoxArt(c.box_art_url),
+      }))
+    } catch (err) {
+      this.logger.error('searchCategories failed', err)
+      throw new InternalServerErrorException('Failed to search Twitch categories')
+    }
+  }
+
+  // Twitch box art comes either as a {width}x{height} template (e.g. /games) or at a
+  // fixed low resolution (…-52x72.jpg from /search/categories) — normalise both to a crisp size.
+  private normalizeBoxArt(url: string): string {
+    return url
+      .replace('{width}', '144')
+      .replace('{height}', '192')
+      .replace(/-\d+x\d+\.jpg$/, '-144x192.jpg')
+  }
+
+  async getStreamsByCategory(
+    gameId: string,
+    cursor?: string,
+    language?: string
+  ): Promise<CategoryStreamsPage> {
+    await this.ensureToken()
+
+    try {
+      const params: Record<string, string | number> = {
+        game_id: gameId,
+        first: HELIX_PAGE_SIZE,
+      }
+      if (cursor) params.after = cursor
+      if (language) params.language = language
+
+      const { data } = await this.helix.get<{
+        data: TwitchHelixStream[]
+        pagination?: { cursor?: string }
+      }>('/streams', { params })
+
+      const streams = data.data.map((s) => this.mapStream(s))
+
+      return { streams, cursor: data.pagination?.cursor ?? null }
+    } catch (err) {
+      this.logger.error('getStreamsByCategory failed', err)
+      throw new InternalServerErrorException('Failed to load streams for category')
+    }
+  }
+
+  async getDiscover(): Promise<DiscoverData> {
+    await this.ensureToken()
+
+    try {
+      const [gamesRes, streamsRes] = await Promise.all([
+        this.helix.get<{ data: TwitchHelixCategory[] }>('/games/top', { params: { first: 12 } }),
+        this.helix.get<{ data: TwitchHelixStream[] }>('/streams', { params: { first: 12 } }),
+      ])
+
+      const categories = gamesRes.data.data.map((c) => ({
+        id: c.id,
+        name: c.name,
+        boxArtUrl: this.normalizeBoxArt(c.box_art_url),
+      }))
+      const streams = streamsRes.data.data.map((s) => this.mapStream(s))
+
+      return { categories, streams }
+    } catch (err) {
+      this.logger.error('getDiscover failed', err)
+      throw new InternalServerErrorException('Failed to load discovery data')
+    }
+  }
+
+  private mapStream(s: TwitchHelixStream): CategoryStream {
+    return {
+      login: s.user_login,
+      displayName: s.user_name,
+      title: s.title,
+      viewerCount: s.viewer_count,
+      thumbnailUrl: s.thumbnail_url.replace('{width}', '440').replace('{height}', '248'),
+      gameName: s.game_name,
     }
   }
 

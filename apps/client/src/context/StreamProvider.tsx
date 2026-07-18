@@ -123,6 +123,15 @@ export function StreamProvider({ children }: { children: ReactNode }) {
         .filter(Boolean)
         .map((ch) => ({ id: makeId(), channel: ch.toLowerCase().trim(), nativeMode: false }))
       dispatch({ type: 'LOAD_STREAMS', streams })
+
+      // Restore the shared layout: which stream is the main view and which has audio.
+      const mainChannel = params.get('main')?.toLowerCase().trim()
+      const mainSlot = mainChannel ? streams.find((s) => s.channel === mainChannel) : undefined
+      if (mainSlot) dispatch({ type: 'SET_MAIN', id: mainSlot.id })
+
+      const audioChannel = params.get('audio')?.toLowerCase().trim()
+      const audioSlot = audioChannel ? streams.find((s) => s.channel === audioChannel) : undefined
+      if (audioSlot) dispatch({ type: 'SET_AUDIO_FOCUS', id: audioSlot.id })
     } else {
       const saved = getActiveStreams()
       if (saved.length > 0) {
@@ -140,6 +149,15 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   }, [state.chatOpen])
 
   const addStream = useCallback((channel: string) => dispatch({ type: 'ADD_STREAM', channel }), [])
+  const loadChannels = useCallback((channels: string[], main?: string | null) => {
+    const streams: StreamSlot[] = channels
+      .filter(Boolean)
+      .map((ch) => ({ id: makeId(), channel: ch.toLowerCase().trim(), nativeMode: false }))
+    dispatch({ type: 'LOAD_STREAMS', streams })
+    const mainChannel = main?.toLowerCase().trim()
+    const mainSlot = mainChannel ? streams.find((s) => s.channel === mainChannel) : undefined
+    if (mainSlot) dispatch({ type: 'SET_MAIN', id: mainSlot.id })
+  }, [])
   const removeStream = useCallback((id: string) => dispatch({ type: 'REMOVE_STREAM', id }), [])
   const reorderStreams = useCallback(
     (streams: StreamSlot[]) => dispatch({ type: 'REORDER_STREAMS', streams }),
@@ -165,6 +183,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       addStream,
+      loadChannels,
       removeStream,
       reorderStreams,
       setMain,
@@ -177,6 +196,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     [
       state,
       addStream,
+      loadChannels,
       removeStream,
       reorderStreams,
       setMain,

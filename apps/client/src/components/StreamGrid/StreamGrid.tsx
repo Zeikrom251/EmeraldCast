@@ -16,10 +16,10 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { MonitorPlay } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useStream } from '../../context/StreamContext'
 import { StreamPlayer } from '../StreamPlayer'
+import { Discover } from '../Discover'
 import { cn } from '../../lib/utils'
 import type { StreamSlot } from '@repo/types'
 
@@ -197,20 +197,7 @@ export function StreamGrid() {
   }
 
   if (streams.length === 0) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_0_40px_var(--accent-glow)]">
-          <MonitorPlay size={28} className="text-[var(--accent)]" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <p className="text-lg font-semibold text-[var(--text-primary)]">No streams yet</p>
-          <p className="max-w-xs text-sm text-[var(--text-muted)]">
-            Search for a Twitch channel above, or pick one from your followed list to start
-            watching.
-          </p>
-        </div>
-      </div>
-    )
+    return <Discover />
   }
 
   const activeSlot = activeId ? streams.find((s) => s.id === activeId) : null

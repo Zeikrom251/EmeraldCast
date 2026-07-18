@@ -1,11 +1,29 @@
-import { Github, Tv2, Gamepad2 } from 'lucide-react'
+import { useState } from 'react'
+import { Github, Tv2, Gamepad2, LayoutGrid, Share2, Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { SearchBar } from '../SearchBar'
+import { CollectionsMenu } from '../CollectionsMenu'
 import { useStream } from '../../context/StreamContext'
-import { cn } from '../../lib/utils'
+import { useCategoryBrowser } from '../../context/CategoryBrowserContext'
+import { cn, buildShareUrl } from '../../lib/utils'
 
 export function Header() {
-  const { streams, nativeModeAll, toggleAllNativeMode } = useStream()
+  const { streams, mainId, audioFocusId, nativeModeAll, toggleAllNativeMode } = useStream()
+  const { openBrowser } = useCategoryBrowser()
+  const [shared, setShared] = useState(false)
+
+  async function handleShare() {
+    const url = buildShareUrl(streams, mainId, audioFocusId)
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      // clipboard blocked (e.g. insecure context) — fall back to a prompt
+      window.prompt('Copy this shareable link:', url)
+      return
+    }
+    setShared(true)
+    window.setTimeout(() => setShared(false), 2000)
+  }
   return (
     <header className="relative flex shrink-0 items-center border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2.5">
       <Link to="/" className="flex shrink-0 items-center gap-2">
@@ -27,6 +45,32 @@ export function Header() {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        {streams.length > 0 && (
+          <button
+            onClick={handleShare}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
+              shared
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            )}
+            title="Copy a shareable link to this multi-view"
+            aria-label="Copy a shareable link to this multi-view"
+          >
+            {shared ? <Check size={14} /> : <Share2 size={14} />}
+            {shared ? 'Copied!' : 'Share'}
+          </button>
+        )}
+        <button
+          onClick={() => openBrowser()}
+          className="flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+          title="Browse streams by category"
+          aria-label="Browse streams by category"
+        >
+          <LayoutGrid size={14} />
+          Categories
+        </button>
+        <CollectionsMenu />
         <button
           onClick={toggleAllNativeMode}
           className={cn(

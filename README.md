@@ -13,6 +13,10 @@ A multi-stream viewer for Twitch. Watch several streams at once, rearrange them 
 - **Per-stream chat** — pin the chat of any active stream in a resizable side panel
 - **Following panel** — connect your Twitch account to see your followed channels and their live status at a glance
 - **Channel search** — search any Twitch channel and add it instantly
+- **Category browsing** — search a category (e.g. Grand Theft Auto V, Just Chatting), filter live streams by language, and add any of them; star categories as favorites for quick access
+- **Discovery home** — an empty grid shows the top live categories and streams so you can jump in with one click
+- **Saved collections** — name and save a whole multi-view setup, then restore it instantly from the header
+- **Shareable links** — copy a link that encodes your current streams, main-view layout, and audio focus so anyone can open the same multi-view
 
 ---
 

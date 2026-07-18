@@ -1,0 +1,1 @@
+export { CollectionsMenu } from './CollectionsMenu'
