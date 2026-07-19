@@ -5,6 +5,7 @@ import { StreamContext, type StreamState } from './StreamContext'
 
 type StreamAction =
   | { type: 'ADD_STREAM'; channel: string }
+  | { type: 'ADD_STREAMS'; channels: string[] }
   | { type: 'REMOVE_STREAM'; id: string }
   | { type: 'REORDER_STREAMS'; streams: StreamSlot[] }
   | { type: 'SET_MAIN'; id: string }
@@ -14,6 +15,7 @@ type StreamAction =
   | { type: 'TOGGLE_ALL_NATIVE_MODE' }
   | { type: 'TOGGLE_NATIVE_MODE'; id: string }
   | { type: 'LOAD_STREAMS'; streams: StreamSlot[] }
+  | { type: 'CLEAR_STREAMS' }
 
 function makeId(): string {
   return crypto.randomUUID()
@@ -27,6 +29,20 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
       const id = makeId()
       const streams = [...state.streams, { id, channel, nativeMode: false }]
       const audioFocusId = state.audioFocusId ?? id
+      return { ...state, streams, audioFocusId }
+    }
+    case 'ADD_STREAMS': {
+      const existing = new Set(state.streams.map((s) => s.channel))
+      const additions: StreamSlot[] = []
+      for (const raw of action.channels) {
+        const channel = raw.toLowerCase().trim()
+        if (!channel || existing.has(channel)) continue
+        existing.add(channel)
+        additions.push({ id: makeId(), channel, nativeMode: false })
+      }
+      if (additions.length === 0) return state
+      const streams = [...state.streams, ...additions]
+      const audioFocusId = state.audioFocusId ?? additions[0].id
       return { ...state, streams, audioFocusId }
     }
     case 'REMOVE_STREAM': {
@@ -92,6 +108,14 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
         audioFocusId,
       }
     }
+    case 'CLEAR_STREAMS':
+      return {
+        ...state,
+        streams: [],
+        mainId: null,
+        chatChannel: null,
+        audioFocusId: null,
+      }
     default:
       return state
   }
@@ -149,6 +173,10 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   }, [state.chatOpen])
 
   const addStream = useCallback((channel: string) => dispatch({ type: 'ADD_STREAM', channel }), [])
+  const addStreams = useCallback(
+    (channels: string[]) => dispatch({ type: 'ADD_STREAMS', channels }),
+    []
+  )
   const loadChannels = useCallback((channels: string[], main?: string | null) => {
     const streams: StreamSlot[] = channels
       .filter(Boolean)
@@ -159,6 +187,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     if (mainSlot) dispatch({ type: 'SET_MAIN', id: mainSlot.id })
   }, [])
   const removeStream = useCallback((id: string) => dispatch({ type: 'REMOVE_STREAM', id }), [])
+  const clearStreams = useCallback(() => dispatch({ type: 'CLEAR_STREAMS' }), [])
   const reorderStreams = useCallback(
     (streams: StreamSlot[]) => dispatch({ type: 'REORDER_STREAMS', streams }),
     []
@@ -183,8 +212,10 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       addStream,
+      addStreams,
       loadChannels,
       removeStream,
+      clearStreams,
       reorderStreams,
       setMain,
       toggleChat,
@@ -196,8 +227,10 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     [
       state,
       addStream,
+      addStreams,
       loadChannels,
       removeStream,
+      clearStreams,
       reorderStreams,
       setMain,
       toggleChat,

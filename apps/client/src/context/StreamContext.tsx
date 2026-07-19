@@ -12,8 +12,10 @@ export interface StreamState {
 
 export interface StreamContextValue extends StreamState {
   addStream: (channel: string) => void
+  addStreams: (channels: string[]) => void
   loadChannels: (channels: string[], main?: string | null) => void
   removeStream: (id: string) => void
+  clearStreams: () => void
   reorderStreams: (streams: StreamSlot[]) => void
   setMain: (id: string) => void
   toggleChat: () => void
