@@ -1,5 +1,16 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { Search, X, ArrowLeft, Loader2, Eye, Gamepad2, Star, Languages } from 'lucide-react'
+import {
+  Search,
+  X,
+  ArrowLeft,
+  Loader2,
+  Eye,
+  Gamepad2,
+  Star,
+  Languages,
+  Check,
+  CheckSquare,
+} from 'lucide-react'
 import axios from 'axios'
 import { api } from '../../lib/api'
 import { useStream } from '../../context/StreamContext'
@@ -72,15 +83,24 @@ const CategoryCard = memo(function CategoryCard({
 const StreamCard = memo(function StreamCard({
   stream,
   onSelect,
+  selectable,
+  selected,
 }: {
   stream: CategoryStream
   onSelect: (login: string) => void
+  selectable: boolean
+  selected: boolean
 }) {
   return (
     <button
       onClick={() => onSelect(stream.login)}
-      className="group flex flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-left transition-colors hover:border-[var(--accent)]"
-      title={`${stream.title} — Add to grid`}
+      className={`group flex flex-col overflow-hidden rounded-lg border bg-[var(--bg-elevated)] text-left transition-colors ${
+        selected
+          ? 'border-[var(--accent)] shadow-[0_0_0_2px_var(--accent-glow)]'
+          : 'border-[var(--border-subtle)] hover:border-[var(--accent)]'
+      }`}
+      title={selectable ? `${stream.title} — Toggle selection` : `${stream.title} — Add to grid`}
+      aria-pressed={selectable ? selected : undefined}
     >
       <div className="relative aspect-video w-full overflow-hidden bg-black/40">
         <img
@@ -89,6 +109,17 @@ const StreamCard = memo(function StreamCard({
           className="h-full w-full object-cover transition-transform group-hover:scale-105"
           loading="lazy"
         />
+        {selectable && (
+          <span
+            className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
+              selected
+                ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                : 'border-white/70 bg-black/50 text-transparent'
+            }`}
+          >
+            <Check size={13} strokeWidth={3} />
+          </span>
+        )}
         <span className="absolute left-1.5 top-1.5 rounded-sm bg-red-600 px-1 py-0.5 text-[9px] font-bold uppercase leading-none text-white">
           Live
         </span>
@@ -108,7 +139,7 @@ const StreamCard = memo(function StreamCard({
 })
 
 export function CategoryBrowser({ open, onClose, initialCategory }: CategoryBrowserProps) {
-  const { addStream } = useStream()
+  const { addStream, addStreams } = useStream()
   const { favorites, isFavorite, toggleFavorite } = useFavoriteCategories()
 
   const [query, setQuery] = useState('')
@@ -117,27 +148,46 @@ export function CategoryBrowser({ open, onClose, initialCategory }: CategoryBrow
 
   const [selected, setSelected] = useState<TwitchCategory | null>(null)
   const [language, setLanguage] = useState('')
+  const [streamFilter, setStreamFilter] = useState('')
   const [streams, setStreams] = useState<CategoryStream[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
   const [loadingStreams, setLoadingStreams] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+
+  // Multi-select mode: pick several streams before adding them to the grid all
+  // at once, instead of the default one-click-adds-and-closes behaviour.
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedLogins, setSelectedLogins] = useState<Set<string>>(() => new Set())
 
   const inputRef = useRef<HTMLInputElement>(null)
 
   const searching = Boolean(query.trim())
   const showDefault = !selected && !searching
 
-  // Reset the search state when the modal closes. On open, either jump straight to a
-  // preselected category (e.g. from the discovery view) or focus the search field.
-  // The chosen language persists across opens, mirroring Twitch's own filter.
+  // Clear everything back to the browse screen. Only the X button resets; every
+  // other way of closing (backdrop, Escape, picking a stream) preserves state,
+  // so reopening the modal lands you right back where you left off.
+  function reset() {
+    setQuery('')
+    setCategories([])
+    setSelected(null)
+    setStreams([])
+    setCursor(null)
+    setStreamFilter('')
+    setSelectMode(false)
+    setSelectedLogins(new Set())
+  }
+
+  function dismiss() {
+    reset()
+    onClose()
+  }
+
+  // On open, either jump straight to a preselected category (e.g. from the
+  // discovery view) or focus the search field.
   useEffect(() => {
-    if (!open) {
-      setQuery('')
-      setCategories([])
-      setSelected(null)
-      setStreams([])
-      setCursor(null)
-    } else if (initialCategory) {
+    if (!open) return
+    if (initialCategory) {
       setSelected(initialCategory)
     } else {
       const id = window.setTimeout(() => inputRef.current?.focus(), 50)
@@ -193,6 +243,9 @@ export function CategoryBrowser({ open, onClose, initialCategory }: CategoryBrow
     setLoadingStreams(true)
     setStreams([])
     setCursor(null)
+    setStreamFilter('')
+    setSelectMode(false)
+    setSelectedLogins(new Set())
     ;(async () => {
       try {
         const page = await api.twitch.categoryStreams(selected.id, { language }, controller.signal)
@@ -221,9 +274,55 @@ export function CategoryBrowser({ open, onClose, initialCategory }: CategoryBrow
   }
 
   function handleSelectStream(login: string) {
+    if (selectMode) {
+      setSelectedLogins((prev) => {
+        const next = new Set(prev)
+        if (next.has(login)) next.delete(login)
+        else next.add(login)
+        return next
+      })
+      return
+    }
     addStream(login)
     onClose()
   }
+
+  function toggleSelectMode() {
+    setSelectMode((prev) => {
+      if (prev) setSelectedLogins(new Set())
+      return !prev
+    })
+  }
+
+  // Add every currently selected stream to the grid in one batch, then close.
+  function addSelected() {
+    if (selectedLogins.size === 0) return
+    addStreams([...selectedLogins])
+    setSelectMode(false)
+    setSelectedLogins(new Set())
+    onClose()
+  }
+
+  // Select all streams currently visible (respecting the active keyword filter).
+  function selectAllVisible() {
+    setSelectedLogins((prev) => {
+      const next = new Set(prev)
+      for (const s of filteredStreams) next.add(s.login)
+      return next
+    })
+  }
+
+  // Client-side filter over the streams already loaded. Twitch's API has no
+  // keyword search within a category's live streams, so this narrows down what's
+  // on screen (across the pages fetched via "Load more") by title or tag.
+  const filterTerm = streamFilter.trim().toLowerCase()
+  const filteredStreams = filterTerm
+    ? streams.filter(
+        (s) =>
+          s.title.toLowerCase().includes(filterTerm) ||
+          s.tags.some((tag) => tag.toLowerCase().includes(filterTerm)),
+      )
+    : streams
 
   const heading = selected ? selected.name : 'Browse Categories'
 
@@ -254,7 +353,7 @@ export function CategoryBrowser({ open, onClose, initialCategory }: CategoryBrow
             {heading}
           </h2>
           <button
-            onClick={onClose}
+            onClick={dismiss}
             className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
             aria-label="Close"
           >
@@ -288,14 +387,46 @@ export function CategoryBrowser({ open, onClose, initialCategory }: CategoryBrow
           </div>
         )}
 
-        {/* Language filter toolbar (while viewing a category) */}
+        {/* Keyword filter + language toolbar (while viewing a category) */}
         {selected && (
-          <div className="flex shrink-0 items-center justify-end gap-2 border-b border-[var(--border-subtle)] px-4 py-2.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-2.5">
+            <div className="flex min-w-[12rem] flex-1 items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2.5 py-1.5 transition-all focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-glow)]">
+              <Search size={14} className="shrink-0 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                placeholder="Filter loaded streams by title or tag…"
+                value={streamFilter}
+                onChange={(e) => setStreamFilter(e.target.value)}
+                className="flex-1 bg-transparent text-xs text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+              />
+              {streamFilter && (
+                <button
+                  onClick={() => setStreamFilter('')}
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  aria-label="Clear filter"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
             <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
               <Languages size={13} />
               Language
             </span>
             <LanguageSelect value={language} onChange={setLanguage} />
+            <button
+              onClick={toggleSelectMode}
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                selectMode
+                  ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                  : 'border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+              title="Select multiple streams to add at once"
+              aria-pressed={selectMode}
+            >
+              <CheckSquare size={13} />
+              {selectMode ? 'Selecting' : 'Select multiple'}
+            </button>
           </div>
         )}
 
@@ -382,31 +513,75 @@ export function CategoryBrowser({ open, onClose, initialCategory }: CategoryBrow
                 </p>
               )}
 
-              {!loadingStreams && streams.length > 0 && (
-                <>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {streams.map((s) => (
-                      <StreamCard key={s.login} stream={s} onSelect={handleSelectStream} />
-                    ))}
-                  </div>
+              {!loadingStreams && streams.length > 0 && filteredStreams.length === 0 && (
+                <p className="py-12 text-center text-sm text-[var(--text-muted)]">
+                  No loaded streams match “{streamFilter.trim()}”. Try “Load more” to fetch
+                  additional streams, then filter again.
+                </p>
+              )}
 
-                  {cursor && (
-                    <div className="flex justify-center pt-4">
-                      <button
-                        onClick={loadMore}
-                        disabled={loadingMore}
-                        className="flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-4 py-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-60"
-                      >
-                        {loadingMore && <Loader2 size={13} className="animate-spin" />}
-                        {loadingMore ? 'Loading…' : 'Load more'}
-                      </button>
-                    </div>
-                  )}
-                </>
+              {!loadingStreams && filteredStreams.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {filteredStreams.map((s) => (
+                    <StreamCard
+                      key={s.login}
+                      stream={s}
+                      onSelect={handleSelectStream}
+                      selectable={selectMode}
+                      selected={selectedLogins.has(s.login)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {!loadingStreams && streams.length > 0 && cursor && (
+                <div className="flex justify-center pt-4">
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-4 py-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-60"
+                  >
+                    {loadingMore && <Loader2 size={13} className="animate-spin" />}
+                    {loadingMore ? 'Loading…' : 'Load more'}
+                  </button>
+                </div>
               )}
             </>
           )}
         </div>
+
+        {/* Multi-select action bar */}
+        {selected && selectMode && (
+          <div className="flex shrink-0 items-center gap-3 border-t border-[var(--border-subtle)] px-4 py-3">
+            <span className="text-xs font-medium text-[var(--text-secondary)]">
+              {selectedLogins.size} selected
+            </span>
+            <button
+              onClick={selectAllVisible}
+              disabled={filteredStreams.length === 0}
+              className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-50"
+            >
+              Select all shown
+            </button>
+            {selectedLogins.size > 0 && (
+              <button
+                onClick={() => setSelectedLogins(new Set())}
+                className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+              >
+                Clear
+              </button>
+            )}
+            <button
+              onClick={addSelected}
+              disabled={selectedLogins.size === 0}
+              className="ml-auto flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              <Check size={14} strokeWidth={3} />
+              Add {selectedLogins.size > 0 ? selectedLogins.size : ''}{' '}
+              {selectedLogins.size === 1 ? 'stream' : 'streams'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

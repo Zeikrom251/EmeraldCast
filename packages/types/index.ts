@@ -44,6 +44,7 @@ export interface CategoryStream {
   viewerCount: number
   thumbnailUrl: string
   gameName: string
+  tags: string[]
 }
 
 export interface CategoryStreamsPage {

@@ -28,6 +28,7 @@ interface TwitchHelixStream {
   viewer_count: number
   started_at: string
   thumbnail_url: string
+  tags: string[] | null
 }
 
 interface TwitchHelixSearchChannel {
@@ -264,6 +265,7 @@ export class TwitchService implements OnModuleInit {
       viewerCount: s.viewer_count,
       thumbnailUrl: s.thumbnail_url.replace('{width}', '440').replace('{height}', '248'),
       gameName: s.game_name,
+      tags: s.tags ?? [],
     }
   }
 
