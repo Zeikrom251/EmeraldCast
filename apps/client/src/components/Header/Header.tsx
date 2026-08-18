@@ -13,7 +13,7 @@ export function Header({ onShowShortcuts }: { onShowShortcuts: () => void }) {
   return (
     <header className="relative flex shrink-0 items-center border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2.5">
       <Link to="/" className="flex shrink-0 items-center gap-2">
-        <img src="/emeraldcast.svg" alt="EmeraldCast" className="h-7 w-auto" />
+        <img src="/emeraldcast-mark.png" alt="EmeraldCast" className="h-7 w-auto" />
         <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
           EMERALD<span className="text-[var(--accent)]">CAST</span>
         </span>
