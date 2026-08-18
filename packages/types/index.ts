@@ -18,6 +18,28 @@ export interface FollowedChannel {
   streamTitle: string
 }
 
+/** Live state of a single channel, polled for the streams currently on screen. */
+export interface StreamStatus {
+  login: string
+  isLive: boolean
+  viewerCount: number
+  title: string
+  gameName: string
+  /** ISO timestamp the current stream started at, or null when offline. */
+  startedAt: string | null
+}
+
+/**
+ * Followed-channel payload. `userToken`/`refreshToken` are only present when the
+ * server had to rotate an expired Twitch token while serving the request — the
+ * client must then replace the credentials it holds.
+ */
+export interface FollowedChannelsResponse {
+  channels: FollowedChannel[]
+  userToken?: string
+  refreshToken?: string
+}
+
 export interface StreamSlot {
   id: string
   channel: string

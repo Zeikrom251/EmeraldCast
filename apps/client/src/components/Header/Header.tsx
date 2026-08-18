@@ -1,4 +1,4 @@
-import { Github, LayoutGrid } from 'lucide-react'
+import { Github, Keyboard, LayoutGrid } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { SearchBar } from '../SearchBar'
 import { CollectionsMenu } from '../CollectionsMenu'
@@ -6,7 +6,7 @@ import { ViewMenu } from '../ViewMenu'
 import { useStream } from '../../context/StreamContext'
 import { useCategoryBrowser } from '../../context/CategoryBrowserContext'
 
-export function Header() {
+export function Header({ onShowShortcuts }: { onShowShortcuts: () => void }) {
   const { streams } = useStream()
   const { openBrowser } = useCategoryBrowser()
 
@@ -42,6 +42,14 @@ export function Header() {
           Categories
         </button>
         <CollectionsMenu />
+        <button
+          onClick={onShowShortcuts}
+          className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+          title="Keyboard shortcuts (?)"
+          aria-label="Keyboard shortcuts"
+        >
+          <Keyboard size={16} />
+        </button>
         <a
           href="https://github.com/Zeikrom251/EmeraldCast"
           target="_blank"

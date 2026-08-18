@@ -1,9 +1,12 @@
 import { useCallback, useState } from 'react'
-import { getFavoriteCategories, saveFavoriteCategories } from '@repo/utils'
+import { getFavoriteCategories, saveFavoriteCategories, STORAGE_KEYS } from '@repo/utils'
 import type { TwitchCategory } from '@repo/types'
+import { useStorageSync } from './useStorageSync'
 
 export function useFavoriteCategories() {
   const [favorites, setFavorites] = useState<TwitchCategory[]>(() => getFavoriteCategories())
+
+  useStorageSync(STORAGE_KEYS.favoriteCategories, getFavoriteCategories, setFavorites)
 
   const isFavorite = useCallback(
     (id: string) => favorites.some((c) => c.id === id),

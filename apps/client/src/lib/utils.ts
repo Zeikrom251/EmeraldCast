@@ -26,6 +26,25 @@ export function buildShareUrl(
   return `${origin}${pathname}?${params.toString()}`
 }
 
+/**
+ * Renders how long a stream has been live as `h:mm` or `mm`, from the ISO
+ * timestamp Helix reports. Returns null for missing or future timestamps so
+ * callers can simply omit the element.
+ */
+export function formatUptime(startedAt: string | null, now: number = Date.now()): string | null {
+  if (!startedAt) return null
+  const started = Date.parse(startedAt)
+  if (Number.isNaN(started)) return null
+
+  const totalMinutes = Math.floor((now - started) / 60_000)
+  if (totalMinutes < 0) return null
+  if (totalMinutes < 60) return `${totalMinutes}m`
+
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${hours}h${String(minutes).padStart(2, '0')}`
+}
+
 export function formatViewerCount(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`
   if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`

@@ -14,6 +14,18 @@ export class CategorySearchQueryDto {
   q!: string
 }
 
+export class StreamStatusQueryDto {
+  /**
+   * Comma-separated Twitch logins. The service sanitises and caps the list, so
+   * this only needs to bound the raw string — 100 logins of 25 characters plus
+   * separators fits comfortably under 2600.
+   */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2600)
+  logins!: string
+}
+
 export class CategoryStreamsQueryDto {
   @IsString()
   @MinLength(1)

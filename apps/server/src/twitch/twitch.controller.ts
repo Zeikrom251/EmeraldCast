@@ -1,15 +1,18 @@
 import { Controller, Get, Query, Redirect, BadRequestException, Headers } from '@nestjs/common'
-import { TwitchService } from './twitch.service'
+import { TwitchService, parseLogins } from './twitch.service'
 import {
   SearchQueryDto,
   CategorySearchQueryDto,
   CategoryStreamsQueryDto,
+  StreamStatusQueryDto,
 } from './dto/twitch-query.dto'
 import type {
   TwitchSearchResult,
   TwitchCategory,
   CategoryStreamsPage,
   DiscoverData,
+  StreamStatus,
+  FollowedChannelsResponse,
 } from '@repo/types'
 import { ConfigService } from '@nestjs/config'
 
@@ -35,16 +38,24 @@ export class TwitchController {
     return this.twitchService.getStreamsByCategory(query.gameId, query.cursor, query.language)
   }
 
+  @Get('streams/status')
+  getStreamStatuses(@Query() query: StreamStatusQueryDto): Promise<StreamStatus[]> {
+    return this.twitchService.getStreamStatuses(parseLogins(query.logins))
+  }
+
   @Get('discover')
   getDiscover(): Promise<DiscoverData> {
     return this.twitchService.getDiscover()
   }
 
   @Get('followed')
-  async getFollowed(@Headers('authorization') auth: string) {
+  async getFollowed(
+    @Headers('authorization') auth: string,
+    @Headers('x-refresh-token') refreshToken?: string
+  ): Promise<FollowedChannelsResponse> {
     const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null
     if (!token) throw new BadRequestException('Missing token')
-    return this.twitchService.refreshFollowedChannels(token)
+    return this.twitchService.refreshFollowedChannels(token, refreshToken || undefined)
   }
 
   @Get('auth/login')

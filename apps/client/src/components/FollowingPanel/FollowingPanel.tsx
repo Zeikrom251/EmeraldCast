@@ -86,6 +86,9 @@ export function FollowingPanel() {
 
   const liveCount = useMemo(() => channels.filter((c) => c.isLive).length, [channels])
 
+  // An expired session still has a real (if stale) list worth showing.
+  const hasChannelList = status === 'connected' || status === 'expired'
+
   function handleConnect() {
     setConnecting()
     window.location.href = LOGIN_URL
@@ -173,6 +176,21 @@ export function FollowingPanel() {
           </div>
         )}
 
+        {status === 'expired' && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[11px] text-amber-400">
+              Twitch session expired — this list is out of date.
+            </p>
+            <button
+              onClick={handleConnect}
+              className="flex items-center justify-center gap-1 rounded-md bg-purple-600 px-2 py-1 text-xs font-medium text-white hover:bg-purple-500"
+            >
+              <RefreshCw size={11} />
+              Reconnect
+            </button>
+          </div>
+        )}
+
         {status === 'error' && (
           <div className="flex flex-col gap-1.5">
             <p className="text-[11px] text-red-400">Connection failed</p>
@@ -187,7 +205,7 @@ export function FollowingPanel() {
         )}
       </div>
 
-      {status === 'connected' && channels.length > 0 && (
+      {hasChannelList && channels.length > 0 && (
         <div className="border-b border-[var(--border-subtle)] px-2 py-1.5">
           <input
             type="text"
@@ -200,7 +218,7 @@ export function FollowingPanel() {
       )}
 
       <div className="flex-1 overflow-y-auto px-1 py-1">
-        {status === 'connected' && filtered.length === 0 && (
+        {hasChannelList && filtered.length === 0 && (
           <p className="px-2 py-4 text-center text-xs text-[var(--text-muted)]">
             {search ? 'No matches' : 'No followed channels'}
           </p>

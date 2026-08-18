@@ -1,172 +1,44 @@
-import { useReducer, useEffect, useMemo, useCallback, type ReactNode } from 'react'
+import { useReducer, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react'
 import type { StreamSlot } from '@repo/types'
-import { getActiveStreams, saveActiveStreams } from '@repo/utils'
-import { StreamContext, type StreamState } from './StreamContext'
-
-type StreamAction =
-  | { type: 'ADD_STREAM'; channel: string }
-  | { type: 'ADD_STREAMS'; channels: string[] }
-  | { type: 'REMOVE_STREAM'; id: string }
-  | { type: 'REORDER_STREAMS'; streams: StreamSlot[] }
-  | { type: 'SET_MAIN'; id: string }
-  | { type: 'TOGGLE_CHAT' }
-  | { type: 'SET_CHAT_CHANNEL'; channel: string | null }
-  | { type: 'SET_AUDIO_FOCUS'; id: string | null }
-  | { type: 'TOGGLE_ALL_NATIVE_MODE' }
-  | { type: 'TOGGLE_NATIVE_MODE'; id: string }
-  | { type: 'LOAD_STREAMS'; streams: StreamSlot[] }
-  | { type: 'CLEAR_STREAMS' }
-
-function makeId(): string {
-  return crypto.randomUUID()
-}
-
-function reducer(state: StreamState, action: StreamAction): StreamState {
-  switch (action.type) {
-    case 'ADD_STREAM': {
-      const channel = action.channel.toLowerCase().trim()
-      if (!channel || state.streams.some((s) => s.channel === channel)) return state
-      const id = makeId()
-      const streams = [...state.streams, { id, channel, nativeMode: false }]
-      const audioFocusId = state.audioFocusId ?? id
-      return { ...state, streams, audioFocusId }
-    }
-    case 'ADD_STREAMS': {
-      const existing = new Set(state.streams.map((s) => s.channel))
-      const additions: StreamSlot[] = []
-      for (const raw of action.channels) {
-        const channel = raw.toLowerCase().trim()
-        if (!channel || existing.has(channel)) continue
-        existing.add(channel)
-        additions.push({ id: makeId(), channel, nativeMode: false })
-      }
-      if (additions.length === 0) return state
-      const streams = [...state.streams, ...additions]
-      const audioFocusId = state.audioFocusId ?? additions[0].id
-      return { ...state, streams, audioFocusId }
-    }
-    case 'REMOVE_STREAM': {
-      const streams = state.streams.filter((s) => s.id !== action.id)
-      const removed = state.streams.find((s) => s.id === action.id)
-      const mainId = state.mainId === action.id ? null : state.mainId
-      const chatChannel = removed?.channel === state.chatChannel ? null : state.chatChannel
-
-      let audioFocusId = state.audioFocusId
-      if (audioFocusId === action.id || (audioFocusId === null && streams.length > 0)) {
-        if (streams.length === 0) {
-          audioFocusId = null
-        } else {
-          const mainStillExists = mainId !== null && streams.some((s) => s.id === mainId)
-          audioFocusId = mainStillExists ? mainId : (streams[0]?.id ?? null)
-        }
-      }
-
-      return { ...state, streams, mainId, chatChannel, audioFocusId }
-    }
-    case 'REORDER_STREAMS':
-      return { ...state, streams: action.streams }
-    case 'SET_MAIN': {
-      const isUnsetting = state.mainId === action.id
-      return {
-        ...state,
-        mainId: isUnsetting ? null : action.id,
-        chatChannel: null,
-        audioFocusId: isUnsetting ? state.audioFocusId : action.id,
-      }
-    }
-    case 'TOGGLE_CHAT':
-      return { ...state, chatOpen: !state.chatOpen }
-    case 'SET_CHAT_CHANNEL':
-      return { ...state, chatChannel: action.channel }
-    case 'SET_AUDIO_FOCUS':
-      return { ...state, audioFocusId: action.id }
-    case 'TOGGLE_ALL_NATIVE_MODE': {
-      const next = !state.nativeModeAll
-      return {
-        ...state,
-        nativeModeAll: next,
-        streams: state.streams.map((s) => ({ ...s, nativeMode: next })),
-      }
-    }
-    case 'TOGGLE_NATIVE_MODE':
-      return {
-        ...state,
-        streams: state.streams.map((s) =>
-          s.id === action.id ? { ...s, nativeMode: !s.nativeMode } : s
-        ),
-      }
-    case 'LOAD_STREAMS': {
-      const audioFocusId =
-        action.streams.length > 0
-          ? state.audioFocusId && action.streams.some((s) => s.id === state.audioFocusId)
-            ? state.audioFocusId
-            : action.streams[0].id
-          : null
-      return {
-        ...state,
-        streams: action.streams.map((s) => ({ ...s, nativeMode: s.nativeMode ?? false })),
-        audioFocusId,
-      }
-    }
-    case 'CLEAR_STREAMS':
-      return {
-        ...state,
-        streams: [],
-        mainId: null,
-        chatChannel: null,
-        audioFocusId: null,
-      }
-    default:
-      return state
-  }
-}
+import { getActiveStreams, saveActiveStreams, subscribeToStorage, STORAGE_KEYS } from '@repo/utils'
+import { StreamContext } from './StreamContext'
+import { createInitialState, makeSlot, reducer } from './streamReducer'
 
 const CHAT_OPEN_KEY = 'ec_chat_open'
 
-function getInitialState(): StreamState {
-  return {
-    streams: [],
-    mainId: null,
-    chatOpen: localStorage.getItem(CHAT_OPEN_KEY) === 'true',
-    chatChannel: null,
-    audioFocusId: null,
-    nativeModeAll: false,
-  }
-}
-
 export function StreamProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, getInitialState)
+  const [state, dispatch] = useReducer(reducer, undefined, () =>
+    createInitialState(
+      window.location.search,
+      getActiveStreams(),
+      localStorage.getItem(CHAT_OPEN_KEY) === 'true'
+    )
+  )
+
+  // The serialised form of what storage is known to hold. It is the pivot for
+  // cross-tab sync: writes that would not change it are skipped, and inbound
+  // changes that match it are ignored, so two tabs cannot ping-pong updates at
+  // each other forever.
+  const persistedRef = useRef<string>(JSON.stringify(state.streams))
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const urlChannels = params.get('streams')
-
-    if (urlChannels) {
-      const streams: StreamSlot[] = urlChannels
-        .split(',')
-        .filter(Boolean)
-        .map((ch) => ({ id: makeId(), channel: ch.toLowerCase().trim(), nativeMode: false }))
-      dispatch({ type: 'LOAD_STREAMS', streams })
-
-      // Restore the shared layout: which stream is the main view and which has audio.
-      const mainChannel = params.get('main')?.toLowerCase().trim()
-      const mainSlot = mainChannel ? streams.find((s) => s.channel === mainChannel) : undefined
-      if (mainSlot) dispatch({ type: 'SET_MAIN', id: mainSlot.id })
-
-      const audioChannel = params.get('audio')?.toLowerCase().trim()
-      const audioSlot = audioChannel ? streams.find((s) => s.channel === audioChannel) : undefined
-      if (audioSlot) dispatch({ type: 'SET_AUDIO_FOCUS', id: audioSlot.id })
-    } else {
-      const saved = getActiveStreams()
-      if (saved.length > 0) {
-        dispatch({ type: 'LOAD_STREAMS', streams: saved })
-      }
-    }
-  }, [])
-
-  useEffect(() => {
+    const serialized = JSON.stringify(state.streams)
+    if (serialized === persistedRef.current) return
+    persistedRef.current = serialized
     saveActiveStreams(state.streams)
   }, [state.streams])
+
+  useEffect(
+    () =>
+      subscribeToStorage(STORAGE_KEYS.streams, () => {
+        const streams = getActiveStreams()
+        const serialized = JSON.stringify(streams)
+        if (serialized === persistedRef.current) return
+        persistedRef.current = serialized
+        dispatch({ type: 'LOAD_STREAMS', streams })
+      }),
+    []
+  )
 
   useEffect(() => {
     localStorage.setItem(CHAT_OPEN_KEY, String(state.chatOpen))
@@ -178,9 +50,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     []
   )
   const loadChannels = useCallback((channels: string[], main?: string | null) => {
-    const streams: StreamSlot[] = channels
-      .filter(Boolean)
-      .map((ch) => ({ id: makeId(), channel: ch.toLowerCase().trim(), nativeMode: false }))
+    const streams: StreamSlot[] = channels.filter(Boolean).map((ch) => makeSlot(ch))
     dispatch({ type: 'LOAD_STREAMS', streams })
     const mainChannel = main?.toLowerCase().trim()
     const mainSlot = mainChannel ? streams.find((s) => s.channel === mainChannel) : undefined
@@ -196,6 +66,10 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   const toggleChat = useCallback(() => dispatch({ type: 'TOGGLE_CHAT' }), [])
   const setChatChannel = useCallback(
     (channel: string | null) => dispatch({ type: 'SET_CHAT_CHANNEL', channel }),
+    []
+  )
+  const setChatMode = useCallback(
+    (mode: 'channel' | 'unified') => dispatch({ type: 'SET_CHAT_MODE', mode }),
     []
   )
   const setAudioFocus = useCallback(
@@ -220,6 +94,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
       setMain,
       toggleChat,
       setChatChannel,
+      setChatMode,
       setAudioFocus,
       toggleAllNativeMode,
       toggleNativeMode,
@@ -235,6 +110,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
       setMain,
       toggleChat,
       setChatChannel,
+      setChatMode,
       setAudioFocus,
       toggleAllNativeMode,
       toggleNativeMode,

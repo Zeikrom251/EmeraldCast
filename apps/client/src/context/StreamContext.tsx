@@ -1,11 +1,15 @@
 import { createContext, useContext } from 'react'
 import type { StreamSlot } from '@repo/types'
 
+export type ChatMode = 'channel' | 'unified'
+
 export interface StreamState {
   streams: StreamSlot[]
   mainId: string | null
   chatOpen: boolean
   chatChannel: string | null
+  /** Whether the chat panel shows one channel's embed or the merged feed. */
+  chatMode: ChatMode
   audioFocusId: string | null
   nativeModeAll: boolean
 }
@@ -20,6 +24,7 @@ export interface StreamContextValue extends StreamState {
   setMain: (id: string) => void
   toggleChat: () => void
   setChatChannel: (channel: string | null) => void
+  setChatMode: (mode: ChatMode) => void
   setAudioFocus: (id: string | null) => void
   toggleAllNativeMode: () => void
   toggleNativeMode: (id: string) => void

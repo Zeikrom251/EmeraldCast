@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bookmark, BookmarkPlus, Trash2, Play, X } from 'lucide-react'
-import { getCollections, saveCollections } from '@repo/utils'
+import { getCollections, saveCollections, STORAGE_KEYS } from '@repo/utils'
+import { useStorageSync } from '../../hooks/useStorageSync'
 import { useStream } from '../../context/StreamContext'
 import type { StreamCollection } from '@repo/types'
 
@@ -14,6 +15,8 @@ export function CollectionsMenu() {
   const [collections, setCollections] = useState<StreamCollection[]>(() => getCollections())
   const [name, setName] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useStorageSync(STORAGE_KEYS.collections, getCollections, setCollections)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

@@ -11,12 +11,16 @@ A multi-stream viewer for Twitch. Watch several streams at once, rearrange them 
 - **Drag-and-drop reordering** — rearrange streams by dragging them within the grid
 - **Per-stream audio focus** — choose which stream plays audio while the rest stay muted
 - **Per-stream chat** — pin the chat of any active stream in a resizable side panel
+- **Unified chat** — merge every open channel into a single colour-coded feed, with emotes, read anonymously straight from Twitch IRC
+- **Live status** — open streams are polled for viewers and uptime, and tiles are flagged the moment a broadcast ends, with one click to clear them all
+- **Keyboard shortcuts** — drive the whole multi-view from the keyboard; press `?` for the full list
 - **Following panel** — connect your Twitch account to see your followed channels and their live status at a glance
 - **Channel search** — search any Twitch channel and add it instantly
 - **Category browsing** — search a category (e.g. Grand Theft Auto V, Just Chatting), filter live streams by language, and add any of them; star categories as favorites for quick access
 - **Discovery home** — an empty grid shows the top live categories and streams so you can jump in with one click
 - **Saved collections** — name and save a whole multi-view setup, then restore it instantly from the header
 - **Shareable links** — copy a link that encodes your current streams, main-view layout, and audio focus so anyone can open the same multi-view
+- **Cross-tab sync** — layouts, collections and favourites stay in step across every open tab
 
 ---
 
@@ -87,6 +91,10 @@ PORT=3001
 
 # Secret used to sign the short-lived JWT returned after OAuth
 JWT_SECRET=change-this-in-production
+
+# Set to "true" only when the API runs behind a trusted reverse proxy, so the
+# rate limiter reads the real client IP instead of the proxy's
+TRUST_PROXY=false
 ```
 
 You will need a Twitch application. Register one at the [Twitch Developer Console](https://dev.twitch.tv/console/apps) and add `http://localhost:3001/api/twitch/auth/callback` as a valid OAuth redirect URI.
@@ -113,6 +121,11 @@ The NestJS server acts as a thin, secure middleware layer between the browser an
 4. Server exchanges the code for a user access token, fetches the user's followed channels, and signs a short-lived JWT
 5. Browser receives the JWT **in the URL fragment** (never in a query parameter or cookie) — it is never sent to any server
 6. The frontend decodes the payload, stores the data in React context, and immediately strips the token from the URL
+7. Twitch user tokens expire after about four hours; the server rotates them with the refresh token on the next followed-channels poll and hands the new pair back, and only asks the user to reconnect once that fails too
+
+**Twitch API budget:** every unauthenticated Helix read is cached server-side for 15–120 seconds depending on how fast the data moves, and simultaneous misses on the same key are coalesced into one upstream request, so a hundred viewers browsing the same category cost one call. Requests are additionally rate-limited per IP.
+
+**Unified chat** connects the browser directly to Twitch's IRC-over-WebSocket gateway with an anonymous `justinfan` login. It is read-only, needs no credentials, and never touches the API server.
 
 ---
 

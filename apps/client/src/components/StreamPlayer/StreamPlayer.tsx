@@ -10,8 +10,12 @@ import {
   Volume2,
   Tv2,
   Gamepad2,
+  Eye,
+  Clock,
+  WifiOff,
 } from 'lucide-react'
-import { cn } from '../../lib/utils'
+import type { StreamStatus } from '@repo/types'
+import { cn, formatUptime, formatViewerCount } from '../../lib/utils'
 
 interface Props {
   id: string
@@ -21,6 +25,8 @@ interface Props {
   isAudioFocus?: boolean
   nativeTwitchMode?: boolean
   muted: boolean
+  /** Latest polled live state; undefined until the first poll returns. */
+  status?: StreamStatus
   onRemove: () => void
   onSetMain?: () => void
   onChatSelect?: () => void
@@ -96,6 +102,7 @@ export const StreamPlayer = memo(function StreamPlayer({
   isAudioFocus,
   nativeTwitchMode = false,
   muted,
+  status,
   onRemove,
   onSetMain,
   onChatSelect,
@@ -263,6 +270,11 @@ export const StreamPlayer = memo(function StreamPlayer({
     return unsubscribe
   }, [ready, muted])
 
+  const isOffline = status?.isLive === false
+  // Recomputed per render, which the status poll triggers every minute — the
+  // same granularity the label is displayed at, so no extra timer is needed.
+  const uptime = status?.isLive ? formatUptime(status.startedAt) : null
+
   function handleOverlayClick() {
     if (!onAudioFocusSelect || isAudioFocus) return
     onAudioFocusSelect()
@@ -274,7 +286,9 @@ export const StreamPlayer = memo(function StreamPlayer({
   // iframe's box (a transparent-centred border div still counts), so an overlay
   // frame silently blocked autoplay. An outline paints over the edges without
   // being an occluding box, so playback starts and the frame stays visible.
-  const frameOutline: React.CSSProperties = nativeTwitchMode
+  const frameOutline: React.CSSProperties = isOffline
+    ? { outline: '2px solid rgb(120 113 108)', outlineOffset: '-2px' }
+    : nativeTwitchMode
     ? { outline: '2px solid rgb(168 85 247)', outlineOffset: '-2px' }
     : isAudioFocus === true
       ? { outline: '2px solid var(--accent)', outlineOffset: '-2px' }
@@ -284,6 +298,9 @@ export const StreamPlayer = memo(function StreamPlayer({
 
   return (
     <div
+      // Lets the fullscreen shortcut find this tile without threading a ref
+      // through the sortable wrapper.
+      data-stream-id={id}
       className="group relative flex h-full flex-col overflow-hidden rounded-xl bg-black"
       onMouseEnter={() => (hoveredRef.current = true)}
       onMouseLeave={() => (hoveredRef.current = false)}
@@ -325,6 +342,20 @@ export const StreamPlayer = memo(function StreamPlayer({
             <span className="rounded-lg bg-black/60 px-2 py-1 text-xs font-semibold text-white/90 backdrop-blur-md">
               {channel}
             </span>
+            {status?.isLive && (
+              <span className="flex items-center gap-2 rounded-lg bg-black/60 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur-md">
+                <span className="flex items-center gap-1">
+                  <Eye size={10} className="text-red-400" />
+                  {formatViewerCount(status.viewerCount)}
+                </span>
+                {uptime && (
+                  <span className="flex items-center gap-1">
+                    <Clock size={10} />
+                    {uptime}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
           <div className="flex gap-1">
             {onSetMain && (
@@ -362,6 +393,19 @@ export const StreamPlayer = memo(function StreamPlayer({
               <X size={14} />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* The only badge shown at rest rather than on hover: it marks a tile whose
+          broadcast has ended, so there is no playback left for it to occlude. It
+          is kept small and in the corner for the same reason the others are
+          hover-gated — Twitch blocks playback under a full-rect overlay. */}
+      {isOffline && (
+        <div className="pointer-events-none absolute bottom-2 right-2 z-30 flex items-center gap-1 rounded-lg bg-black/80 px-2 py-1 backdrop-blur-md">
+          <WifiOff size={11} className="text-stone-400" />
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-300">
+            Offline
+          </span>
         </div>
       )}
 

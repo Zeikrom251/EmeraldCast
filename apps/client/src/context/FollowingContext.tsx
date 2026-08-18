@@ -1,7 +1,12 @@
 import { createContext, useContext } from 'react'
 import type { FollowedChannel } from '@repo/types'
 
-type ConnectStatus = 'idle' | 'connecting' | 'connected' | 'error'
+/**
+ * `expired` is distinct from `error`: the connection worked and the channel list
+ * on screen is real, but the Twitch credentials can no longer be refreshed, so
+ * the list is frozen until the user reconnects.
+ */
+type ConnectStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'expired'
 
 export interface FollowingState {
   status: ConnectStatus
@@ -10,7 +15,12 @@ export interface FollowingState {
 }
 
 export interface FollowingContextValue extends FollowingState {
-  setConnected: (username: string, channels: FollowedChannel[], userToken?: string) => void
+  setConnected: (
+    username: string,
+    channels: FollowedChannel[],
+    userToken?: string,
+    refreshToken?: string
+  ) => void
   setConnecting: () => void
   setError: () => void
   disconnect: () => void

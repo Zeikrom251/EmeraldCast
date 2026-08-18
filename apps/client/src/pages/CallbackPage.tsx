@@ -8,6 +8,7 @@ interface JwtPayload {
   username: string
   channels: FollowedChannel[]
   userToken?: string
+  refreshToken?: string
 }
 
 export function CallbackPage() {
@@ -35,7 +36,7 @@ export function CallbackPage() {
         throw new Error('Invalid token payload')
       }
 
-      setConnected(payload.username, payload.channels, payload.userToken)
+      setConnected(payload.username, payload.channels, payload.userToken, payload.refreshToken)
     } catch {
       setError()
     }

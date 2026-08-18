@@ -4,6 +4,28 @@ const STREAMS_KEY = 'emeraldcast:streams'
 const FAVORITE_CATEGORIES_KEY = 'emeraldcast:favorite-categories'
 const COLLECTIONS_KEY = 'emeraldcast:collections'
 
+export const STORAGE_KEYS = {
+  streams: STREAMS_KEY,
+  favoriteCategories: FAVORITE_CATEGORIES_KEY,
+  collections: COLLECTIONS_KEY,
+} as const
+
+/**
+ * Calls `onChange` when another tab writes `key`.
+ *
+ * The `storage` event only fires in *other* documents, so this never echoes a
+ * tab's own writes. A null `event.key` means the whole store was cleared, which
+ * affects every key and therefore also notifies.
+ */
+export function subscribeToStorage(key: string, onChange: () => void): () => void {
+  function handleStorage(event: StorageEvent) {
+    if (event.key !== null && event.key !== key) return
+    onChange()
+  }
+  window.addEventListener('storage', handleStorage)
+  return () => window.removeEventListener('storage', handleStorage)
+}
+
 export function getActiveStreams(): StreamSlot[] {
   try {
     const raw = localStorage.getItem(STREAMS_KEY)

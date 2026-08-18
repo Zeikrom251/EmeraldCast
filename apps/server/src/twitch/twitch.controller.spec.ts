@@ -9,10 +9,11 @@ describe('TwitchController', () => {
 
   const mockService = {
     searchChannels: jest.fn().mockResolvedValue([]),
-    refreshFollowedChannels: jest.fn().mockResolvedValue([]),
+    refreshFollowedChannels: jest.fn().mockResolvedValue({ channels: [] }),
     searchCategories: jest.fn().mockResolvedValue([]),
     getStreamsByCategory: jest.fn().mockResolvedValue({ streams: [], cursor: null }),
     getDiscover: jest.fn().mockResolvedValue({ categories: [], streams: [] }),
+    getStreamStatuses: jest.fn().mockResolvedValue([]),
   }
 
   beforeEach(async () => {
@@ -56,6 +57,16 @@ describe('TwitchController', () => {
 
   it('getFollowed delegates the bearer token to the service', async () => {
     await controller.getFollowed('Bearer abc123')
-    expect(service.refreshFollowedChannels).toHaveBeenCalledWith('abc123')
+    expect(service.refreshFollowedChannels).toHaveBeenCalledWith('abc123', undefined)
+  })
+
+  it('getFollowed passes the refresh token through when the client sends one', async () => {
+    await controller.getFollowed('Bearer abc123', 'refresh-me')
+    expect(service.refreshFollowedChannels).toHaveBeenCalledWith('abc123', 'refresh-me')
+  })
+
+  it('getStreamStatuses sanitises the login list before delegating', async () => {
+    await controller.getStreamStatuses({ logins: 'Shroud, pokimane ,shroud,bad login!' })
+    expect(service.getStreamStatuses).toHaveBeenCalledWith(['pokimane', 'shroud'])
   })
 })

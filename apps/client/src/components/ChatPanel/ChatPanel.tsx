@@ -1,8 +1,10 @@
-import { X, MessageSquare } from 'lucide-react'
+import { X, MessageSquare, Layers } from 'lucide-react'
 import { useStream } from '../../context/StreamContext'
+import { UnifiedChat } from './UnifiedChat'
+import { cn } from '../../lib/utils'
 
 export function ChatPanel() {
-  const { streams, mainId, chatOpen, chatChannel, toggleChat } = useStream()
+  const { streams, mainId, chatOpen, chatChannel, chatMode, toggleChat, setChatMode } = useStream()
 
   if (!chatOpen || streams.length === 0) return null
 
@@ -19,7 +21,10 @@ export function ChatPanel() {
           ? streams.find((s) => s.id === effectiveMainId)!.channel
           : null
 
-  if (!displayChannel) return null
+  // With a single stream there is nothing to merge, so the richer Twitch embed
+  // wins regardless of the remembered mode.
+  const unified = chatMode === 'unified' && streams.length > 1
+  if (!displayChannel && !unified) return null
 
   const parent = window.location.hostname || 'localhost'
   const chatSrc = `https://www.twitch.tv/embed/${displayChannel}/chat?parent=${parent}&darkpopout`
@@ -29,12 +34,39 @@ export function ChatPanel() {
       className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
       style={{ width: 320 }}
     >
-      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
-        <MessageSquare size={13} className="shrink-0 text-[var(--accent)]" />
-        <span className="truncate text-xs font-semibold text-[var(--text-primary)]">
-          {displayChannel}
-        </span>
-        <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">chat</span>
+      <div className="flex items-center gap-1 border-b border-[var(--border-subtle)] px-2 py-1.5">
+        <button
+          onClick={() => setChatMode('channel')}
+          disabled={!displayChannel}
+          className={cn(
+            'flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors disabled:opacity-40',
+            !unified && displayChannel
+              ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+          )}
+          title={displayChannel ? `${displayChannel} chat` : 'Pick a stream to show its chat'}
+        >
+          <MessageSquare size={12} className="shrink-0" />
+          <span className="truncate font-semibold">{displayChannel ?? 'Channel'}</span>
+        </button>
+
+        {/* One channel needs no merging — the embed is strictly better there. */}
+        {streams.length > 1 && (
+          <button
+            onClick={() => setChatMode('unified')}
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+              unified
+                ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            )}
+            title="Merge every open channel into one feed"
+          >
+            <Layers size={12} />
+            <span className="font-semibold">All</span>
+          </button>
+        )}
+
         <button
           onClick={toggleChat}
           className="ml-auto shrink-0 rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
@@ -44,7 +76,12 @@ export function ChatPanel() {
           <X size={13} />
         </button>
       </div>
-      <iframe src={chatSrc} className="w-full flex-1 border-0" title={`${displayChannel} chat`} />
+
+      {unified ? (
+        <UnifiedChat channels={streams.map((s) => s.channel)} />
+      ) : (
+        <iframe src={chatSrc} className="w-full flex-1 border-0" title={`${displayChannel} chat`} />
+      )}
     </div>
   )
 }

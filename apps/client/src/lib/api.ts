@@ -1,9 +1,10 @@
 import type {
   TwitchSearchResult,
-  FollowedChannel,
+  FollowedChannelsResponse,
   TwitchCategory,
   CategoryStreamsPage,
   DiscoverData,
+  StreamStatus,
 } from '@repo/types'
 import axios, { type AxiosRequestConfig } from 'axios'
 
@@ -24,9 +25,18 @@ export const api = {
     search: (q: string, signal?: AbortSignal) =>
       get<TwitchSearchResult[]>(`/api/twitch/search`, { params: { q }, signal }),
 
-    followed: (userToken: string) =>
-      get<FollowedChannel[]>(`/api/twitch/followed`, {
-        headers: { Authorization: `Bearer ${userToken}` },
+    followed: (userToken: string, refreshToken?: string) =>
+      get<FollowedChannelsResponse>(`/api/twitch/followed`, {
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          ...(refreshToken ? { 'x-refresh-token': refreshToken } : {}),
+        },
+      }),
+
+    streamStatus: (logins: string[], signal?: AbortSignal) =>
+      get<StreamStatus[]>(`/api/twitch/streams/status`, {
+        params: { logins: logins.join(',') },
+        signal,
       }),
 
     discover: (signal?: AbortSignal) =>

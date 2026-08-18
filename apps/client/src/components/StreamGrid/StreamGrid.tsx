@@ -16,8 +16,10 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { WifiOff, X } from 'lucide-react'
 import { useStream } from '../../context/StreamContext'
+import { useStreamStatus } from '../../context/StreamStatusContext'
 import { StreamPlayer } from '../StreamPlayer'
 import { Discover } from '../Discover'
 import { cn } from '../../lib/utils'
@@ -59,6 +61,45 @@ interface SortablePlayerProps {
   style?: React.CSSProperties
 }
 
+function OfflineBanner({
+  channels,
+  onRemoveAll,
+  onDismiss,
+}: {
+  channels: string[]
+  onRemoveAll: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2">
+      <WifiOff size={13} className="shrink-0 text-stone-400" />
+      <p className="min-w-0 flex-1 truncate text-xs text-[var(--text-secondary)]">
+        <span className="font-semibold text-[var(--text-primary)]">
+          {channels.length === 1 ? `${channels[0]} is` : `${channels.length} streams are`}
+        </span>{' '}
+        no longer live
+        {channels.length > 1 && (
+          <span className="text-[var(--text-muted)]"> — {channels.join(', ')}</span>
+        )}
+      </p>
+      <button
+        onClick={onRemoveAll}
+        className="shrink-0 rounded-md bg-[var(--accent)] px-2 py-1 text-[11px] font-semibold text-black transition-opacity hover:opacity-90"
+      >
+        Remove {channels.length > 1 ? 'them' : 'it'}
+      </button>
+      <button
+        onClick={onDismiss}
+        className="shrink-0 rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+        title="Dismiss"
+        aria-label="Dismiss offline notice"
+      >
+        <X size={13} />
+      </button>
+    </div>
+  )
+}
+
 function SortablePlayer({ slot, isMain, isActiveChat, isAudioFocus, style: extraStyle }: SortablePlayerProps) {
   const {
     attributes,
@@ -80,6 +121,7 @@ function SortablePlayer({ slot, isMain, isActiveChat, isAudioFocus, style: extra
     setAudioFocus,
     toggleChat,
   } = useStream()
+  const { statuses } = useStreamStatus()
   const nativeTwitchMode = slot.nativeMode
 
   const muted = audioFocusId !== null && slot.id !== audioFocusId
@@ -120,6 +162,7 @@ function SortablePlayer({ slot, isMain, isActiveChat, isAudioFocus, style: extra
         isAudioFocus={isAudioFocus}
         nativeTwitchMode={nativeTwitchMode}
         muted={muted}
+        status={statuses[slot.channel]}
         onRemove={onRemove}
         onSetMain={onSetMain}
         onChatSelect={onChatSelect}
@@ -142,12 +185,23 @@ function getGridCols(count: number): string {
 }
 
 export function StreamGrid() {
-  const { streams, mainId, chatChannel, audioFocusId, reorderStreams } = useStream()
+  const { streams, mainId, chatChannel, audioFocusId, reorderStreams, removeStream } = useStream()
+  const { offlineChannels } = useStreamStatus()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(256)
+  const [dismissedOffline, setDismissedOffline] = useState<string[]>([])
   const gridRef = useRef<HTMLDivElement>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  // Forget dismissals for channels that came back online (or were removed), so a
+  // second outage is announced again.
+  useEffect(() => {
+    setDismissedOffline((prev) => {
+      const next = prev.filter((ch) => offlineChannels.includes(ch))
+      return next.length === prev.length ? prev : next
+    })
+  }, [offlineChannels])
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string)
@@ -215,6 +269,16 @@ export function StreamGrid() {
         ? mainSlot!.channel
         : null
 
+  // A channel that goes offline and comes back should be announced again, so the
+  // dismissal is remembered per channel rather than as a single global flag.
+  const announcedOffline = offlineChannels.filter((ch) => !dismissedOffline.includes(ch))
+
+  function removeOfflineStreams() {
+    for (const slot of streams.filter((s) => announcedOffline.includes(s.channel))) {
+      removeStream(slot.id)
+    }
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -223,53 +287,65 @@ export function StreamGrid() {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <SortableContext
-        items={(isSidebarMode ? sideSlots : streams).map((s) => s.id)}
-        strategy={isSidebarMode ? verticalListSortingStrategy : rectSortingStrategy}
-      >
-        <div
-          ref={gridRef}
-          className={cn(
-            'flex-1 overflow-hidden grid',
-            !isSidebarMode && cn('gap-2', getGridCols(streams.length))
-          )}
-          style={
-            isSidebarMode
-              ? {
-                  gridTemplateColumns: `1fr ${RESIZE_HANDLE_WIDTH}px ${sidebarWidth}px`,
-                  gridTemplateRows: `repeat(${sideRowCount}, minmax(0, 1fr))`,
-                  rowGap: '0.5rem',
-                }
-              : { gridAutoRows: 'minmax(0, 1fr)' }
-          }
+      <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-hidden">
+        {announcedOffline.length > 0 && (
+          <OfflineBanner
+            channels={announcedOffline}
+            onRemoveAll={removeOfflineStreams}
+            onDismiss={() => setDismissedOffline(offlineChannels)}
+          />
+        )}
+        <SortableContext
+          items={(isSidebarMode ? sideSlots : streams).map((s) => s.id)}
+          strategy={isSidebarMode ? verticalListSortingStrategy : rectSortingStrategy}
         >
-          {isSidebarMode && (
-            <div className="h-full" style={{ gridColumn: 2, gridRow: `1 / span ${sideRowCount}` }}>
-              <ResizeHandle onResizeStart={startSidebarResize} />
-            </div>
-          )}
-          {streams.map((slot) => {
-            const isMain = isSidebarMode && slot.id === effectiveMainId
-            const sideIndex = isSidebarMode ? sideSlots.findIndex((s) => s.id === slot.id) : -1
-            return (
-              <SortablePlayer
-                key={slot.channel}
-                slot={slot}
-                isMain={isMain}
-                isActiveChat={activeChatChannel === slot.channel}
-                isAudioFocus={streams.length > 1 ? audioFocusId === slot.id : undefined}
-                style={
-                  isSidebarMode
-                    ? isMain
-                      ? { gridColumn: 1, gridRow: `1 / span ${sideRowCount}` }
-                      : { gridColumn: 3, gridRow: sideIndex + 1 }
-                    : undefined
-                }
-              />
-            )
-          })}
-        </div>
-      </SortableContext>
+          <div
+            ref={gridRef}
+            className={cn(
+              'flex-1 overflow-hidden grid',
+              !isSidebarMode && cn('gap-2', getGridCols(streams.length))
+            )}
+            style={
+              isSidebarMode
+                ? {
+                    gridTemplateColumns: `1fr ${RESIZE_HANDLE_WIDTH}px ${sidebarWidth}px`,
+                    gridTemplateRows: `repeat(${sideRowCount}, minmax(0, 1fr))`,
+                    rowGap: '0.5rem',
+                  }
+                : { gridAutoRows: 'minmax(0, 1fr)' }
+            }
+          >
+            {isSidebarMode && (
+              <div
+                className="h-full"
+                style={{ gridColumn: 2, gridRow: `1 / span ${sideRowCount}` }}
+              >
+                <ResizeHandle onResizeStart={startSidebarResize} />
+              </div>
+            )}
+            {streams.map((slot) => {
+              const isMain = isSidebarMode && slot.id === effectiveMainId
+              const sideIndex = isSidebarMode ? sideSlots.findIndex((s) => s.id === slot.id) : -1
+              return (
+                <SortablePlayer
+                  key={slot.channel}
+                  slot={slot}
+                  isMain={isMain}
+                  isActiveChat={activeChatChannel === slot.channel}
+                  isAudioFocus={streams.length > 1 ? audioFocusId === slot.id : undefined}
+                  style={
+                    isSidebarMode
+                      ? isMain
+                        ? { gridColumn: 1, gridRow: `1 / span ${sideRowCount}` }
+                        : { gridColumn: 3, gridRow: sideIndex + 1 }
+                      : undefined
+                  }
+                />
+              )
+            })}
+          </div>
+        </SortableContext>
+      </div>
       <DragOverlay>{activeSlot ? <DragPreview channel={activeSlot.channel} /> : null}</DragOverlay>
     </DndContext>
   )

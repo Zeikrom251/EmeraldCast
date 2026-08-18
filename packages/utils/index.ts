@@ -5,4 +5,6 @@ export {
   saveFavoriteCategories,
   getCollections,
   saveCollections,
+  subscribeToStorage,
+  STORAGE_KEYS,
 } from './storage'
