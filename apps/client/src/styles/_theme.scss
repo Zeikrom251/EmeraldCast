@@ -1,19 +1,24 @@
+// Mirrors the "EmeraldCast" variable collection in the Figma redesign.
 :root {
-  --bg-base: #0a0a0b;
-  --bg-surface: #121214;
-  --bg-elevated: #19191c;
-  --bg-hover: #222226;
+  --bg-base: #060a09;
+  --bg-surface: #0b1210;
+  --bg-elevated: #111a17;
+  --bg-hover: #18231f;
 
-  --text-primary: #f2f2f3;
-  --text-secondary: #a8a8b3;
-  --text-muted: #5c5c68;
+  --text-primary: #ecf3f0;
+  --text-secondary: #9bb0a8;
+  --text-muted: #5b6e67;
 
-  --border-subtle: #232328;
-  --border-default: #34343b;
+  --border-subtle: #18221f;
+  --border-default: #253430;
 
-  --accent: #10b981;
-  --accent-hover: #34d399;
-  --accent-glow: rgba(16, 185, 129, 0.35);
+  --accent: #2ee59d;
+  --accent-hover: #5cefb5;
+  --accent-strong: #12b97a;
+  --accent-ink: #03140d;
+  --accent-glow: rgba(46, 229, 157, 0.3);
+  --accent-tint: rgba(46, 229, 157, 0.12);
 
-  --live-dot: #eb0400;
+  --live-dot: #ff4d4d;
+  --offline: #6b7a75;
 }

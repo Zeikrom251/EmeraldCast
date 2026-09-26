@@ -1,6 +1,11 @@
 // Typography
-$font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-$font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+$font-sans:
+  'Geist',
+  system-ui,
+  -apple-system,
+  sans-serif;
+$font-display: 'Bricolage Grotesque', 'Geist', system-ui, sans-serif;
+$font-mono: 'Geist Mono', ui-monospace, monospace;
 
 // Spacing scale
 $space-1: 0.25rem;
