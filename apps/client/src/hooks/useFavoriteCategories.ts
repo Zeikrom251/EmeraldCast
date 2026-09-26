@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import { getFavoriteCategories, saveFavoriteCategories, STORAGE_KEYS } from '@repo/utils'
-import type { TwitchCategory } from '@repo/types'
+import { getFavoriteCategories, saveFavoriteCategories, STORAGE_KEYS } from '../lib/storage'
+import type { TwitchCategory } from '../types'
 import { useStorageSync } from './useStorageSync'
 
 export function useFavoriteCategories() {
@@ -8,10 +8,7 @@ export function useFavoriteCategories() {
 
   useStorageSync(STORAGE_KEYS.favoriteCategories, getFavoriteCategories, setFavorites)
 
-  const isFavorite = useCallback(
-    (id: string) => favorites.some((c) => c.id === id),
-    [favorites]
-  )
+  const isFavorite = useCallback((id: string) => favorites.some((c) => c.id === id), [favorites])
 
   const toggleFavorite = useCallback((category: TwitchCategory) => {
     setFavorites((prev) => {
