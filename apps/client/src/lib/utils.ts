@@ -1,13 +1,13 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { StreamSlot } from '@repo/types'
+import type { StreamSlot } from '../types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 // Builds a shareable URL that encodes the current streams, the main-view layout,
-// and which stream holds audio focus — so a whole multi-view can be restored from a link.
+// and which stream holds audio focus, so a whole multi-view can be restored from a link.
 export function buildShareUrl(
   streams: StreamSlot[],
   mainId: string | null,
@@ -49,4 +49,30 @@ export function formatViewerCount(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`
   if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`
   return String(count)
+}
+
+const CHANNEL_RE = /^[a-z0-9_]{1,25}$/
+
+/**
+ * Turns what a user types (`xqc`, `twitch.tv/xqc`, a full channel URL) into a
+ * channel login, or null when it cannot be one.
+ */
+export function parseChannel(input: string): string | null {
+  let value = input.trim().toLowerCase()
+  const match = value.match(/(?:^|\/\/|\.|^www\.)twitch\.tv\/([^/?#\s]+)/)
+  if (match) value = match[1]
+  value = value.replace(/^@/, '')
+  return CHANNEL_RE.test(value) ? value : null
+}
+
+/** Copies a share link, falling back to a prompt when the clipboard is blocked. Returns true if copied. */
+export async function copyShareUrl(url: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(url)
+    return true
+  } catch {
+    // clipboard blocked (e.g. insecure context): let the user copy it by hand
+    window.prompt('Copy this shareable link:', url)
+    return false
+  }
 }

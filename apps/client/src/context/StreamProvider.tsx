@@ -1,6 +1,12 @@
 import { useReducer, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react'
-import type { StreamSlot } from '@repo/types'
-import { getActiveStreams, saveActiveStreams, subscribeToStorage, STORAGE_KEYS } from '@repo/utils'
+import type { StreamSlot } from '../types'
+import {
+  getActiveStreams,
+  saveActiveStreams,
+  pushRecentChannels,
+  subscribeToStorage,
+  STORAGE_KEYS,
+} from '../lib/storage'
 import { StreamContext } from './StreamContext'
 import { createInitialState, makeSlot, reducer } from './streamReducer'
 
@@ -26,6 +32,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     if (serialized === persistedRef.current) return
     persistedRef.current = serialized
     saveActiveStreams(state.streams)
+    pushRecentChannels(state.streams.map((s) => s.channel))
   }, [state.streams])
 
   useEffect(

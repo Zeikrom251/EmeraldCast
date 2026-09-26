@@ -8,6 +8,8 @@ export interface Shortcut {
 
 /** Source of truth for the help overlay, so the list can never drift from the handler. */
 export const SHORTCUTS: Shortcut[] = [
+  { keys: '⌘ K', description: 'Add a channel or run a command' },
+  { keys: 'B', description: 'Browse categories' },
   { keys: '1 – 9', description: 'Give audio to the nth stream' },
   { keys: 'M', description: 'Mute every stream' },
   { keys: 'F', description: 'Fullscreen the focused stream' },
@@ -35,7 +37,7 @@ function toggleFullscreen(streamId: string): void {
   }
   const tile = document.querySelector<HTMLElement>(`[data-stream-id="${CSS.escape(streamId)}"]`)
   void tile?.requestFullscreen?.().catch(() => {
-    // Denied (no user gesture, or nested in a restricted iframe) — nothing to do.
+    // Denied (no user gesture, or nested in a restricted iframe): nothing to do.
   })
 }
 
@@ -45,7 +47,11 @@ function toggleFullscreen(streamId: string): void {
  * Keys are read from `event.key`, so they follow the user's keyboard layout;
  * chords (Ctrl/Cmd/Alt) are left alone so browser and OS shortcuts keep working.
  */
-export function useKeyboardShortcuts(onShowHelp: () => void): void {
+export function useKeyboardShortcuts(
+  onShowHelp: () => void,
+  onOpenPalette: () => void,
+  onToggleBrowse: () => void
+): void {
   const {
     streams,
     mainId,
@@ -61,6 +67,12 @@ export function useKeyboardShortcuts(onShowHelp: () => void): void {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      // The one chord we own: it works even while typing, like every command palette.
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        onOpenPalette()
+        return
+      }
       if (event.ctrlKey || event.metaKey || event.altKey) return
       if (isTypingTarget(event.target)) return
 
@@ -108,6 +120,10 @@ export function useKeyboardShortcuts(onShowHelp: () => void): void {
           event.preventDefault()
           removeStream(focusedId)
           break
+        case 'b':
+          event.preventDefault()
+          onToggleBrowse()
+          break
         case '?':
           event.preventDefault()
           onShowHelp()
@@ -129,5 +145,7 @@ export function useKeyboardShortcuts(onShowHelp: () => void): void {
     toggleAllNativeMode,
     removeStream,
     onShowHelp,
+    onOpenPalette,
+    onToggleBrowse,
   ])
 }

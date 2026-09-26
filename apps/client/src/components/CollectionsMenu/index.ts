@@ -1,1 +1,0 @@
-export { CollectionsMenu } from './CollectionsMenu'

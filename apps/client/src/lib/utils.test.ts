@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { StreamSlot } from '@repo/types'
-import { buildShareUrl, formatUptime, formatViewerCount } from './utils'
+import type { StreamSlot } from '../types'
+import { buildShareUrl, formatUptime, formatViewerCount, parseChannel } from './utils'
 
 const slot = (id: string, channel: string): StreamSlot => ({ id, channel, nativeMode: false })
 
@@ -53,5 +53,21 @@ describe('buildShareUrl', () => {
     const url = new URL(buildShareUrl([slot('1', 'a'), slot('2', 'b')], 'gone', 'gone'))
     expect(url.searchParams.has('main')).toBe(false)
     expect(url.searchParams.has('audio')).toBe(false)
+  })
+})
+
+describe('parseChannel', () => {
+  it('accepts bare logins, links and @handles', () => {
+    expect(parseChannel('  XQC ')).toBe('xqc')
+    expect(parseChannel('@pixel_brew')).toBe('pixel_brew')
+    expect(parseChannel('twitch.tv/shroud')).toBe('shroud')
+    expect(parseChannel('https://www.twitch.tv/shroud?sr=a')).toBe('shroud')
+    expect(parseChannel('https://m.twitch.tv/shroud/videos')).toBe('shroud')
+  })
+
+  it('rejects things that cannot be a login', () => {
+    expect(parseChannel('')).toBeNull()
+    expect(parseChannel('two words')).toBeNull()
+    expect(parseChannel('https://youtube.com/watch')).toBeNull()
   })
 })
