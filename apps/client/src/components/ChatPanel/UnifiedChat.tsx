@@ -2,7 +2,6 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useUnifiedChat } from '../../hooks/useUnifiedChat'
 import { emoteUrl, type ChatMessage } from '../../lib/twitchChat'
-import { cn } from '../../lib/utils'
 
 /**
  * Stable per-channel accent so a chatter's source is readable at a glance even
@@ -10,14 +9,14 @@ import { cn } from '../../lib/utils'
  * same across sessions and across tabs.
  */
 const CHANNEL_COLORS = [
-  'text-emerald-300',
-  'text-sky-300',
-  'text-amber-300',
-  'text-fuchsia-300',
-  'text-rose-300',
-  'text-violet-300',
-  'text-lime-300',
-  'text-cyan-300',
+  '#2ee59d',
+  '#7aa2ff',
+  '#ff9f45',
+  '#e879f9',
+  '#ff8fa3',
+  '#c3a6ff',
+  '#9ef01a',
+  '#67e8f9',
 ]
 
 function channelColor(channel: string): string {
@@ -36,32 +35,45 @@ const ChatLine = memo(function ChatLine({
   showChannel: boolean
 }) {
   return (
-    <div className="px-2 py-[3px] text-xs leading-snug">
+    <div className="flex gap-2.5 px-3.5 py-1.5">
       {showChannel && (
-        <span className={cn('mr-1.5 font-semibold', channelColor(message.channel))}>
-          #{message.channel}
-        </span>
+        <span
+          className="w-[3px] shrink-0 rounded-full"
+          style={{ background: channelColor(message.channel) }}
+          title={message.channel}
+        />
       )}
-      <span className="font-semibold" style={{ color: message.color ?? 'var(--text-secondary)' }}>
-        {message.displayName}
-      </span>
-      <span className="text-[var(--text-muted)]">: </span>
-      <span className="text-[var(--text-primary)]">
-        {message.fragments.map((fragment, index) =>
-          fragment.type === 'text' ? (
-            <span key={index}>{fragment.value}</span>
-          ) : (
-            <img
-              key={index}
-              src={emoteUrl(fragment.id)}
-              alt={fragment.alt}
-              title={fragment.alt}
-              className="mx-0.5 inline-block h-5 w-auto align-middle"
-              loading="lazy"
-            />
-          )
-        )}
-      </span>
+      <div className="min-w-0 text-[13px] leading-[18px]">
+        <div className="flex items-baseline gap-1.5">
+          <span
+            className="truncate text-xs font-semibold"
+            style={{ color: message.color ?? 'var(--text-secondary)' }}
+          >
+            {message.displayName}
+          </span>
+          {showChannel && (
+            <span className="shrink-0 font-mono text-[10px] text-[var(--text-muted)]">
+              {message.channel}
+            </span>
+          )}
+        </div>
+        <p className="break-words text-[var(--text-secondary)]">
+          {message.fragments.map((fragment, index) =>
+            fragment.type === 'text' ? (
+              <span key={index}>{fragment.value}</span>
+            ) : (
+              <img
+                key={index}
+                src={emoteUrl(fragment.id)}
+                alt={fragment.alt}
+                title={fragment.alt}
+                className="mx-0.5 inline-block h-5 w-auto align-middle"
+                loading="lazy"
+              />
+            )
+          )}
+        </p>
+      </div>
     </div>
   )
 })
@@ -88,7 +100,7 @@ export function UnifiedChat({ channels }: { channels: string[] }) {
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto py-1">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto py-2">
         {messages.length === 0 && (
           <div className="flex items-center justify-center gap-1.5 px-3 py-6 text-center text-[11px] text-[var(--text-muted)]">
             {status === 'connected' ? (
@@ -109,7 +121,7 @@ export function UnifiedChat({ channels }: { channels: string[] }) {
       {!pinned && (
         <button
           onClick={() => setPinned(true)}
-          className="absolute inset-x-2 bottom-2 rounded-md bg-[var(--accent)] py-1 text-[11px] font-semibold text-black shadow-lg"
+          className="absolute inset-x-3 bottom-3 rounded-[10px] bg-[var(--accent)] py-1.5 text-xs font-semibold text-[var(--accent-ink)] shadow-lg"
         >
           Jump to latest
         </button>

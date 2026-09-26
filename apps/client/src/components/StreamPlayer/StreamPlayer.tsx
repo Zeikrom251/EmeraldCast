@@ -14,7 +14,7 @@ import {
   Clock,
   WifiOff,
 } from 'lucide-react'
-import type { StreamStatus } from '@repo/types'
+import type { StreamStatus } from '../../types'
 import { cn, formatUptime, formatViewerCount } from '../../lib/utils'
 
 interface Props {
@@ -159,7 +159,7 @@ export const StreamPlayer = memo(function StreamPlayer({
           // not met: style visibility"). An explicit play() call overrides that
           // gate, but the player's isPaused() reports false optimistically right
           // after load even while playback is actually blocked, so it can't be
-          // trusted as a guard for the initial start — we just re-issue play()
+          // trusted as a guard for the initial start, so we just re-issue play()
           // unconditionally a handful of times across the first few seconds
           // (a no-op once it is actually playing).
           const kick = () => {
@@ -185,7 +185,7 @@ export const StreamPlayer = memo(function StreamPlayer({
           // ending, a rebuffer, or Twitch's visibility observer reacting to the
           // hover controls overlapping the iframe. In EmeraldCast mode the user
           // cannot pause deliberately (the iframe is pointer-events:none), so any
-          // pause is unintended and we resume it — but we skip while the tile is
+          // pause is unintended and we resume it, but we skip while the tile is
           // hovered, because the controls are on top of the video then and
           // fighting that just rebuffers; the stream resumes the instant the
           // pointer leaves.
@@ -206,7 +206,7 @@ export const StreamPlayer = memo(function StreamPlayer({
               listeners.push([event, handler])
               player.addEventListener(event, handler)
             } catch {
-              // embed build without this event constant — safe to skip
+              // embed build without this event constant: safe to skip
             }
           }
           wire(window.Twitch?.Player?.PLAYBACK_BLOCKED, kick)
@@ -217,7 +217,7 @@ export const StreamPlayer = memo(function StreamPlayer({
         })
       })
       .catch(() => {
-        // embed script unavailable — the container simply stays empty
+        // embed script unavailable: the container simply stays empty
       })
 
     return () => {
@@ -271,7 +271,7 @@ export const StreamPlayer = memo(function StreamPlayer({
   }, [ready, muted])
 
   const isOffline = status?.isLive === false
-  // Recomputed per render, which the status poll triggers every minute — the
+  // Recomputed per render, which the status poll triggers every minute, the
   // same granularity the label is displayed at, so no extra timer is needed.
   const uptime = status?.isLive ? formatUptime(status.startedAt) : null
 
@@ -281,20 +281,35 @@ export const StreamPlayer = memo(function StreamPlayer({
   }
 
   // The selection frame is drawn as an `outline` on the iframe container rather
-  // than as an element layered on top of it. Twitch's player refuses to play —
-  // even via an explicit play() call — whenever any full-rect element covers the
+  // than as an element layered on top of it. Twitch's player refuses to play
+  // (even via an explicit play() call) whenever any full-rect element covers the
   // iframe's box (a transparent-centred border div still counts), so an overlay
   // frame silently blocked autoplay. An outline paints over the edges without
   // being an occluding box, so playback starts and the frame stays visible.
   const frameOutline: React.CSSProperties = isOffline
-    ? { outline: '2px solid rgb(120 113 108)', outlineOffset: '-2px' }
+    ? { outline: '2px solid var(--offline)', outlineOffset: '-2px' }
     : nativeTwitchMode
-    ? { outline: '2px solid rgb(168 85 247)', outlineOffset: '-2px' }
-    : isAudioFocus === true
-      ? { outline: '2px solid var(--accent)', outlineOffset: '-2px' }
-      : isActiveChat
-        ? { outline: '2px solid color-mix(in srgb, var(--accent) 40%, transparent)', outlineOffset: '-2px' }
-        : { outline: '1px solid var(--border-subtle)', outlineOffset: '-1px' }
+      ? { outline: '2px solid rgb(168 85 247)', outlineOffset: '-2px' }
+      : isAudioFocus === true
+        ? { outline: '2px solid var(--accent)', outlineOffset: '-2px' }
+        : isActiveChat
+          ? { outline: '2px solid var(--accent-glow)', outlineOffset: '-2px' }
+          : { outline: '1px solid var(--border-subtle)', outlineOffset: '-1px' }
+
+  const pill = 'rounded-[10px] bg-[#050807]/70 backdrop-blur-md'
+  const control =
+    'pointer-events-auto rounded-[7px] p-1.5 text-white/85 transition-colors hover:bg-white/10 hover:text-white'
+
+  const nativeToggle = onNativeModeToggle && (
+    <button
+      onClick={onNativeModeToggle}
+      className={cn(control, nativeTwitchMode && 'bg-purple-600/90 text-white hover:bg-purple-500')}
+      title={nativeTwitchMode ? 'Switch to EmeraldCast mode' : 'Switch to Twitch player mode'}
+      aria-label={nativeTwitchMode ? 'Switch to EmeraldCast mode' : 'Switch to Twitch player mode'}
+    >
+      {nativeTwitchMode ? <Gamepad2 size={15} /> : <Tv2 size={15} />}
+    </button>
+  )
 
   return (
     <div
@@ -305,92 +320,101 @@ export const StreamPlayer = memo(function StreamPlayer({
       onMouseEnter={() => (hoveredRef.current = true)}
       onMouseLeave={() => (hoveredRef.current = false)}
     >
-      {onNativeModeToggle && (
-        <div className="absolute right-2 top-2 z-30 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            onClick={onNativeModeToggle}
-            className={cn(
-              'rounded-lg p-1.5 backdrop-blur-md transition-colors',
-              nativeTwitchMode
-                ? 'bg-purple-600/90 text-white hover:bg-purple-500'
-                : 'bg-black/60 text-white/80 hover:bg-black/80 hover:text-white'
-            )}
-            title={nativeTwitchMode ? 'Switch to EmeraldCast mode' : 'Switch to Native Twitch mode'}
-            aria-label={
-              nativeTwitchMode ? 'Switch to EmeraldCast mode' : 'Switch to Native Twitch mode'
-            }
-          >
-            {nativeTwitchMode ? <Gamepad2 size={14} /> : <Tv2 size={14} />}
-          </button>
+      {/* In Twitch mode the player owns the whole tile, so only the way back out is offered. */}
+      {nativeTwitchMode && nativeToggle && (
+        <div
+          className={cn(
+            pill,
+            'absolute right-2.5 top-2.5 z-30 p-[3px] opacity-0 transition-opacity group-hover:opacity-100'
+          )}
+        >
+          {nativeToggle}
         </div>
       )}
 
       {!nativeTwitchMode && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between bg-gradient-to-b from-black/60 to-transparent p-2 pb-6 pr-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          <div className="flex items-center gap-1.5">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 bg-gradient-to-b from-black/60 to-transparent p-2.5 pb-8 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="flex min-w-0 items-center gap-1.5">
             {dragHandleRef && (
               <div
                 ref={dragHandleRef}
                 {...dragListeners}
-                className="pointer-events-auto touch-none cursor-grab rounded-lg bg-black/60 p-1.5 text-white/70 backdrop-blur-md transition-colors hover:text-white active:cursor-grabbing"
+                className={cn(
+                  pill,
+                  'pointer-events-auto touch-none cursor-grab p-1.5 text-white/70 transition-colors hover:text-white active:cursor-grabbing'
+                )}
                 title="Drag to reorder"
                 aria-label="Drag handle"
               >
                 <GripVertical size={14} />
               </div>
             )}
-            <span className="rounded-lg bg-black/60 px-2 py-1 text-xs font-semibold text-white/90 backdrop-blur-md">
-              {channel}
-            </span>
-            {status?.isLive && (
-              <span className="flex items-center gap-2 rounded-lg bg-black/60 px-2 py-1 text-[10px] font-medium text-white/80 backdrop-blur-md">
-                <span className="flex items-center gap-1">
-                  <Eye size={10} className="text-red-400" />
-                  {formatViewerCount(status.viewerCount)}
-                </span>
-                {uptime && (
+            <span className={cn(pill, 'flex min-w-0 items-center gap-2 py-1.5 pl-2 pr-2.5')}>
+              {status?.isLive && (
+                <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--live-dot)]" />
+              )}
+              <span className="truncate text-[13px] font-semibold text-white">{channel}</span>
+              {status?.isLive && (
+                <span className="flex shrink-0 items-center gap-2 font-mono text-[11px] font-medium text-white/75">
                   <span className="flex items-center gap-1">
-                    <Clock size={10} />
-                    {uptime}
+                    <Eye size={12} />
+                    {formatViewerCount(status.viewerCount)}
                   </span>
-                )}
-              </span>
-            )}
+                  {uptime && (
+                    <span className="flex items-center gap-1">
+                      <Clock size={12} />
+                      {uptime}
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
           </div>
-          <div className="flex gap-1">
+          <div className={cn(pill, 'flex shrink-0 gap-0.5 p-[3px]')}>
+            {onAudioFocusSelect && isAudioFocus !== undefined && (
+              <button
+                onClick={onAudioFocusSelect}
+                className={cn(
+                  control,
+                  isAudioFocus && 'text-[var(--accent)] hover:text-[var(--accent)]'
+                )}
+                title={isAudioFocus ? 'Playing audio' : 'Listen to this stream'}
+                aria-label={isAudioFocus ? 'Playing audio' : 'Listen to this stream'}
+              >
+                <Volume2 size={15} />
+              </button>
+            )}
             {onSetMain && (
               <button
                 onClick={onSetMain}
-                className={cn(
-                  'pointer-events-auto rounded-lg bg-black/60 p-1.5 text-white/80 backdrop-blur-md transition-colors hover:bg-black/80 hover:text-white',
-                  isMain && 'text-[var(--accent)]'
-                )}
-                title={isMain ? 'Exit main view' : 'Set as main stream'}
-                aria-label={isMain ? 'Exit main view' : 'Set as main stream'}
+                className={cn(control, isMain && 'text-[var(--accent)] hover:text-[var(--accent)]')}
+                title={isMain ? 'Exit focus layout' : 'Focus this stream'}
+                aria-label={isMain ? 'Exit focus layout' : 'Focus this stream'}
               >
-                {isMain ? <Shrink size={14} /> : <Expand size={14} />}
+                {isMain ? <Shrink size={15} /> : <Expand size={15} />}
               </button>
             )}
             {onChatSelect && (
               <button
                 onClick={onChatSelect}
                 className={cn(
-                  'pointer-events-auto rounded-lg bg-black/60 p-1.5 text-white/80 backdrop-blur-md transition-colors hover:bg-black/80 hover:text-white',
-                  isActiveChat && 'text-[var(--accent)]'
+                  control,
+                  isActiveChat && 'text-[var(--accent)] hover:text-[var(--accent)]'
                 )}
                 title={isActiveChat ? 'Active chat' : 'Switch chat to this stream'}
                 aria-label={isActiveChat ? 'Active chat' : 'Switch chat to this stream'}
               >
-                <MessageSquare size={14} />
+                <MessageSquare size={15} />
               </button>
             )}
+            {nativeToggle}
             <button
               onClick={onRemove}
-              className="pointer-events-auto rounded-lg bg-black/60 p-1.5 text-white/80 backdrop-blur-md transition-colors hover:bg-red-600/90 hover:text-white"
+              className={cn(control, 'text-[#ff8a8a] hover:bg-red-600/90 hover:text-white')}
               title="Remove stream"
               aria-label="Remove stream"
             >
-              <X size={14} />
+              <X size={15} />
             </button>
           </div>
         </div>
@@ -399,11 +423,11 @@ export const StreamPlayer = memo(function StreamPlayer({
       {/* The only badge shown at rest rather than on hover: it marks a tile whose
           broadcast has ended, so there is no playback left for it to occlude. It
           is kept small and in the corner for the same reason the others are
-          hover-gated — Twitch blocks playback under a full-rect overlay. */}
+          hover-gated: Twitch blocks playback under a full-rect overlay. */}
       {isOffline && (
-        <div className="pointer-events-none absolute bottom-2 right-2 z-30 flex items-center gap-1 rounded-lg bg-black/80 px-2 py-1 backdrop-blur-md">
-          <WifiOff size={11} className="text-stone-400" />
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-300">
+        <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-30 flex items-center gap-1.5 rounded-lg bg-[#050807]/80 px-2 py-1 backdrop-blur-md">
+          <WifiOff size={11} className="text-[var(--offline)]" />
+          <span className="font-mono text-[10px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
             Offline
           </span>
         </div>
@@ -413,7 +437,7 @@ export const StreamPlayer = memo(function StreamPlayer({
           outline; these badges only appear on hover so they never occlude the
           iframe at rest (an opacity-0 element is not treated as an occluder). */}
       {nativeTwitchMode && (
-        <div className="pointer-events-none absolute left-2 top-2 z-30 flex items-center gap-1 rounded-lg bg-purple-600/90 px-2 py-1 opacity-0 backdrop-blur-md transition-opacity duration-200 group-hover:opacity-100">
+        <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 flex items-center gap-1 rounded-lg bg-purple-600/90 px-2 py-1 opacity-0 backdrop-blur-md transition-opacity duration-200 group-hover:opacity-100">
           <Gamepad2 size={11} className="text-white" />
           <span className="text-[10px] font-semibold uppercase tracking-wide text-white">
             Twitch Mode
@@ -422,25 +446,25 @@ export const StreamPlayer = memo(function StreamPlayer({
       )}
 
       {!nativeTwitchMode && (isAudioFocus !== undefined || pendingUnmute) && (
-        <div className="pointer-events-none absolute bottom-2 left-2 z-30 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-30 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           {pendingUnmute && !muted ? (
-            <div className="flex items-center gap-1.5 rounded-lg bg-black/70 px-2 py-1 backdrop-blur-md">
+            <div className="flex items-center gap-1.5 rounded-lg bg-[#050807]/80 px-2 py-1 backdrop-blur-md">
               <Volume2 size={11} className="text-amber-400" />
               <span className="text-[10px] font-medium text-amber-300">
                 Click anywhere to enable sound
               </span>
             </div>
           ) : isAudioFocus ? (
-            <div className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)]/90 px-2 py-1 backdrop-blur-md">
-              <Volume2 size={11} className="text-white" />
-              <span className="text-[10px] font-semibold text-white">Audio</span>
+            <div className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-2 py-1">
+              <Volume2 size={12} strokeWidth={2.5} className="text-[var(--accent-ink)]" />
+              <span className="text-xs font-semibold text-[var(--accent-ink)]">Audio</span>
             </div>
           ) : null}
         </div>
       )}
 
       {/* Click-to-focus catcher. It sits BELOW the iframe in the stacking order
-          (z-0 vs the container's z-[1]) so it never visually covers the player —
+          (z-0 vs the container's z-[1]) so it never visually covers the player:
           browsers pause / refuse to play an iframe they consider occluded by an
           overlay. Clicks still reach it because the iframe container is
           pointer-events:none, so pointer events fall straight through to here. */}

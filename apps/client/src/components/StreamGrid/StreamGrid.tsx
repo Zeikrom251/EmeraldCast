@@ -21,9 +21,8 @@ import { WifiOff, X } from 'lucide-react'
 import { useStream } from '../../context/StreamContext'
 import { useStreamStatus } from '../../context/StreamStatusContext'
 import { StreamPlayer } from '../StreamPlayer'
-import { Discover } from '../Discover'
 import { cn } from '../../lib/utils'
-import type { StreamSlot } from '@repo/types'
+import type { StreamSlot } from '../../types'
 
 const SIDEBAR_MIN = 160
 const SIDEBAR_MAX = 560
@@ -31,7 +30,7 @@ const RESIZE_HANDLE_WIDTH = 10
 
 function DragPreview({ channel }: { channel: string }) {
   return (
-    <div className="flex h-full w-full items-center justify-center rounded-lg border-2 border-[var(--accent)] bg-black/90 shadow-2xl">
+    <div className="flex h-full w-full items-center justify-center rounded-xl border-2 border-[var(--accent)] bg-[var(--bg-base)] shadow-2xl">
       <span className="text-sm font-semibold text-white">{channel}</span>
     </div>
   )
@@ -71,20 +70,20 @@ function OfflineBanner({
   onDismiss: () => void
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2">
-      <WifiOff size={13} className="shrink-0 text-stone-400" />
+    <div className="flex shrink-0 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
+      <WifiOff size={13} className="shrink-0 text-[var(--offline)]" />
       <p className="min-w-0 flex-1 truncate text-xs text-[var(--text-secondary)]">
         <span className="font-semibold text-[var(--text-primary)]">
           {channels.length === 1 ? `${channels[0]} is` : `${channels.length} streams are`}
         </span>{' '}
         no longer live
         {channels.length > 1 && (
-          <span className="text-[var(--text-muted)]"> — {channels.join(', ')}</span>
+          <span className="text-[var(--text-muted)]"> ({channels.join(', ')})</span>
         )}
       </p>
       <button
         onClick={onRemoveAll}
-        className="shrink-0 rounded-md bg-[var(--accent)] px-2 py-1 text-[11px] font-semibold text-black transition-opacity hover:opacity-90"
+        className="shrink-0 rounded-lg bg-[var(--accent)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-ink)] transition-colors hover:bg-[var(--accent-hover)]"
       >
         Remove {channels.length > 1 ? 'them' : 'it'}
       </button>
@@ -100,7 +99,13 @@ function OfflineBanner({
   )
 }
 
-function SortablePlayer({ slot, isMain, isActiveChat, isAudioFocus, style: extraStyle }: SortablePlayerProps) {
+function SortablePlayer({
+  slot,
+  isMain,
+  isActiveChat,
+  isAudioFocus,
+  style: extraStyle,
+}: SortablePlayerProps) {
   const {
     attributes,
     listeners,
@@ -250,9 +255,7 @@ export function StreamGrid() {
     document.addEventListener('mouseup', onUp)
   }
 
-  if (streams.length === 0) {
-    return <Discover />
-  }
+  if (streams.length === 0) return null
 
   const activeSlot = activeId ? streams.find((s) => s.id === activeId) : null
 

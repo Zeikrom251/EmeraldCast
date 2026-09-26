@@ -124,7 +124,7 @@ export function parseIrcMessage(line: string): IrcMessage | null {
  * Splits message text into text and emote fragments using the `emotes` tag.
  *
  * Twitch's indices count code points, not UTF-16 units, so the text is walked
- * as an array of code points — otherwise any astral character earlier in the
+ * as an array of code points; otherwise any astral character earlier in the
  * message (an emoji, say) shifts every emote after it.
  */
 export function buildFragments(text: string, emotesTag: string | undefined): MessageFragment[] {
