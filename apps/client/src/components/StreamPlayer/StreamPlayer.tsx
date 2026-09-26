@@ -118,6 +118,11 @@ export const StreamPlayer = memo(function StreamPlayer({
   const hoveredRef = useRef(false)
   const [ready, setReady] = useState(false)
   const [pendingUnmute, setPendingUnmute] = useState(false)
+  // Controls are revealed by real pointer movement, not CSS :hover. A tile that
+  // mounts under a resting cursor (e.g. right after clicking "Add stream") would
+  // otherwise show its controls over the iframe at once, and Twitch refuses to
+  // start a player that something visible is covering.
+  const [showControls, setShowControls] = useState(false)
   mutedRef.current = muted
   nativeModeRef.current = nativeTwitchMode
 
@@ -317,15 +322,23 @@ export const StreamPlayer = memo(function StreamPlayer({
       // through the sortable wrapper.
       data-stream-id={id}
       className="group relative flex h-full flex-col overflow-hidden rounded-xl bg-black"
-      onMouseEnter={() => (hoveredRef.current = true)}
-      onMouseLeave={() => (hoveredRef.current = false)}
+      data-controls={showControls || undefined}
+      onMouseMove={() => {
+        if (hoveredRef.current) return
+        hoveredRef.current = true
+        setShowControls(true)
+      }}
+      onMouseLeave={() => {
+        hoveredRef.current = false
+        setShowControls(false)
+      }}
     >
       {/* In Twitch mode the player owns the whole tile, so only the way back out is offered. */}
       {nativeTwitchMode && nativeToggle && (
         <div
           className={cn(
             pill,
-            'absolute right-2.5 top-2.5 z-30 p-[3px] opacity-0 transition-opacity group-hover:opacity-100'
+            'absolute right-2.5 top-2.5 z-30 p-[3px] opacity-0 transition-opacity group-data-[controls]:opacity-100'
           )}
         >
           {nativeToggle}
@@ -333,7 +346,7 @@ export const StreamPlayer = memo(function StreamPlayer({
       )}
 
       {!nativeTwitchMode && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 bg-gradient-to-b from-black/60 to-transparent p-2.5 pb-8 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 bg-gradient-to-b from-black/60 to-transparent p-2.5 pb-8 opacity-0 transition-opacity duration-200 group-data-[controls]:opacity-100">
           <div className="flex min-w-0 items-center gap-1.5">
             {dragHandleRef && (
               <div
@@ -437,7 +450,7 @@ export const StreamPlayer = memo(function StreamPlayer({
           outline; these badges only appear on hover so they never occlude the
           iframe at rest (an opacity-0 element is not treated as an occluder). */}
       {nativeTwitchMode && (
-        <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 flex items-center gap-1 rounded-lg bg-purple-600/90 px-2 py-1 opacity-0 backdrop-blur-md transition-opacity duration-200 group-hover:opacity-100">
+        <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 flex items-center gap-1 rounded-lg bg-purple-600/90 px-2 py-1 opacity-0 backdrop-blur-md transition-opacity duration-200 group-data-[controls]:opacity-100">
           <Gamepad2 size={11} className="text-white" />
           <span className="text-[10px] font-semibold uppercase tracking-wide text-white">
             Twitch Mode
@@ -446,7 +459,7 @@ export const StreamPlayer = memo(function StreamPlayer({
       )}
 
       {!nativeTwitchMode && (isAudioFocus !== undefined || pendingUnmute) && (
-        <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-30 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <div className="pointer-events-none absolute bottom-2.5 right-2.5 z-30 opacity-0 transition-opacity duration-200 group-data-[controls]:opacity-100">
           {pendingUnmute && !muted ? (
             <div className="flex items-center gap-1.5 rounded-lg bg-[#050807]/80 px-2 py-1 backdrop-blur-md">
               <Volume2 size={11} className="text-amber-400" />
