@@ -4,38 +4,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>EmeraldCast — Watch Multiple Twitch Streams at Once</title>
+    <title>EmeraldCast: Watch Multiple Twitch Streams at Once</title>
     <meta
       name="description"
-      content="Free multi-stream viewer for Twitch. Watch several streams side by side, drag-and-drop layouts, per-stream chat and audio focus — no account needed."
+      content="Free multi-stream viewer for Twitch. Watch several streams side by side, search any channel, pick whose audio you hear and follow every chat in one merged feed. No account needed."
     />
     <link rel="canonical" href="https://emeraldcast.vercel.app/" />
-    <meta name="theme-color" content="#0a0a0b" />
+    <meta name="theme-color" content="#060a09" />
 
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600;700&display=swap"
+    />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="EmeraldCast" />
-    <meta property="og:title" content="EmeraldCast — Watch Multiple Twitch Streams at Once" />
+    <meta property="og:title" content="EmeraldCast: Watch Multiple Twitch Streams at Once" />
     <meta
       property="og:description"
-      content="Free multi-stream viewer for Twitch. Watch several streams side by side, drag-and-drop layouts, per-stream chat and audio focus — no account needed."
+      content="Free multi-stream viewer for Twitch. Watch several streams side by side, search any channel, pick whose audio you hear and follow every chat in one merged feed. No account needed."
     />
     <meta property="og:url" content="https://emeraldcast.vercel.app/" />
     <meta property="og:image" content="https://emeraldcast.vercel.app/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta
+      property="og:image:alt"
+      content="EmeraldCast: a wall of four Twitch streams on one screen, with one stream playing audio"
+    />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="EmeraldCast — Watch Multiple Twitch Streams at Once" />
+    <meta name="twitter:title" content="EmeraldCast: Watch Multiple Twitch Streams at Once" />
     <meta
       name="twitter:description"
-      content="Free multi-stream viewer for Twitch. Watch several streams side by side with drag-and-drop layouts and per-stream chat."
+      content="Watch several Twitch streams side by side, with one merged chat. Free, no account needed."
     />
     <meta name="twitter:image" content="https://emeraldcast.vercel.app/og-image.png" />
+    <meta
+      name="twitter:image:alt"
+      content="EmeraldCast: a wall of four Twitch streams on one screen, with one stream playing audio"
+    />
 
     <script type="application/ld+json">
       {
@@ -43,7 +58,7 @@
         "@type": "WebApplication",
         "name": "EmeraldCast",
         "url": "https://emeraldcast.vercel.app/",
-        "description": "Free multi-stream viewer for Twitch. Watch several streams side by side, rearrange them with drag-and-drop, and follow any stream's chat — all from a single page.",
+        "description": "Free multi-stream viewer for Twitch. Watch several streams side by side, rearrange them with drag-and-drop, and follow any stream's chat, all from a single page.",
         "applicationCategory": "EntertainmentApplication",
         "operatingSystem": "Any",
         "browserRequirements": "Requires JavaScript",
@@ -54,7 +69,7 @@
     <style>
       /* Pre-hydration splash: matches the app theme so first paint is never a white flash */
       html {
-        background: #0a0a0b;
+        background: #060a09;
       }
       .prerender {
         min-height: 100dvh;
@@ -64,8 +79,12 @@
         justify-content: center;
         gap: 0.75rem;
         padding: 2rem;
-        font-family: 'Inter', system-ui, -apple-system, sans-serif;
-        color: #f2f2f3;
+        font-family:
+          'Geist',
+          system-ui,
+          -apple-system,
+          sans-serif;
+        color: #ecf3f0;
         text-align: center;
       }
       .prerender h1 {
@@ -73,11 +92,11 @@
         font-weight: 700;
       }
       .prerender h1 span {
-        color: #10b981;
+        color: #2ee59d;
       }
       .prerender p,
       .prerender li {
-        color: #a8a8b3;
+        color: #9bb0a8;
         font-size: 0.9rem;
         max-width: 34rem;
       }
@@ -95,17 +114,17 @@
     <div id="root">
       <!-- Static content for crawlers without JavaScript; replaced when React mounts -->
       <div class="prerender">
-        <h1>EMERALD<span>CAST</span> — watch multiple Twitch streams at once</h1>
+        <h1>Emerald<span>Cast</span>: watch multiple Twitch streams at once</h1>
         <p>
           EmeraldCast is a free multi-stream viewer for Twitch. Open as many streams as you want
           side by side, rearrange them with drag-and-drop, pick which stream plays audio, and pin
-          any stream's chat — no account required.
+          any stream's chat. No account required.
         </p>
         <ul>
           <li>Multi-stream grid</li>
           <li>Main + sidebar layout</li>
           <li>Per-stream chat &amp; audio focus</li>
-          <li>Twitch followed-channels list</li>
+          <li>Merged chat across streams</li>
           <li>Shareable stream links</li>
         </ul>
         <p>Loading the app…</p>

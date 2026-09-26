@@ -11,7 +11,7 @@
 - Drag and drop streams to reorder them
 - Choose which stream plays audio; all others stay muted
 - Pin any stream's chat in a side panel
-- Connect a Twitch account (optional) to see followed channels and their live status
+- Search any Twitch channel and add it, or merge every open chat into one feed
 - Share a set of streams via URL, e.g. https://emeraldcast.vercel.app/?streams=channel1,channel2
 
 ## Links
