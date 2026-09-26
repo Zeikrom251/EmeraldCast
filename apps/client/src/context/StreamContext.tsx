@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { StreamSlot } from '@repo/types'
+import type { StreamSlot } from '../types'
 
 export type ChatMode = 'channel' | 'unified'
 

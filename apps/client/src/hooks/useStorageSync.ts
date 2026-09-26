@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { subscribeToStorage } from '@repo/utils'
+import { subscribeToStorage } from '../lib/storage'
 
 /**
  * Keeps local state in step with a localStorage key another tab may write.

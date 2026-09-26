@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { StreamStatus } from '@repo/types'
+import type { StreamStatus } from '../types'
 
 export interface StreamStatusValue {
   /** Latest known status per channel login. Absent means "not checked yet". */

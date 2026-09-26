@@ -31,18 +31,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache turbo build outputs
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-${{ runner.os }}-${{ github.sha }}
-          restore-keys: turbo-${{ runner.os }}-
-
       - name: Lint
         run: pnpm lint
 
-      # Runs before the tests because both apps depend on the workspace packages
-      # being compiled to dist/.
       - name: Build
         run: pnpm build
 

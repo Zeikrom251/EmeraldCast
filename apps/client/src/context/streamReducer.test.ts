@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { StreamSlot } from '@repo/types'
+import type { StreamSlot } from '../types'
 import type { StreamState } from './StreamContext'
 import { createInitialState, reducer } from './streamReducer'
 

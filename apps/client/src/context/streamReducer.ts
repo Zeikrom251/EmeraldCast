@@ -1,4 +1,4 @@
-import type { StreamSlot } from '@repo/types'
+import type { StreamSlot } from '../types'
 import type { StreamState } from './StreamContext'
 
 export type StreamAction =
@@ -134,7 +134,7 @@ export function reducer(state: StreamState, action: StreamAction): StreamState {
  * Builds the state the app starts from.
  *
  * A `?streams=` link always wins over the saved session, so opening someone
- * else's share link never silently merges with — or overwrites — what the tab
+ * else's share link never silently merges with (or overwrites) what the tab
  * already had. This runs synchronously as the reducer's initialiser rather than
  * in an effect, so the first paint already has the right streams and nothing
  * ever persists an empty list over a real one.
