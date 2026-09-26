@@ -1,26 +1,25 @@
 # EmeraldCast
 
-A multi-stream viewer for Twitch. Watch several streams at once, rearrange them with drag-and-drop, and keep an eye on your followed channels — all from a single page.
+A multi-stream viewer for Twitch. Watch several streams at once, rearrange them with drag-and-drop, and follow every chat in one merged feed, all from a single static page with no account and no backend.
 
 ---
 
 ## Features
 
-- **Multi-stream playback** — open as many Twitch streams as you want side by side
-- **Flexible layouts** — switch between Grid and Main + Sidebar (with a resizable sidebar) at any time
-- **Drag-and-drop reordering** — rearrange streams by dragging them within the grid
-- **Per-stream audio focus** — choose which stream plays audio while the rest stay muted
-- **Per-stream chat** — pin the chat of any active stream in a resizable side panel
-- **Unified chat** — merge every open channel into a single colour-coded feed, with emotes, read anonymously straight from Twitch IRC
-- **Live status** — open streams are polled for viewers and uptime, and tiles are flagged the moment a broadcast ends, with one click to clear them all
-- **Keyboard shortcuts** — drive the whole multi-view from the keyboard; press `?` for the full list
-- **Following panel** — connect your Twitch account to see your followed channels and their live status at a glance
-- **Channel search** — search any Twitch channel and add it instantly
-- **Category browsing** — search a category (e.g. Grand Theft Auto V, Just Chatting), filter live streams by language, and add any of them; star categories as favorites for quick access
-- **Discovery home** — an empty grid shows the top live categories and streams so you can jump in with one click
-- **Saved collections** — name and save a whole multi-view setup, then restore it instantly from the header
-- **Shareable links** — copy a link that encodes your current streams, main-view layout, and audio focus so anyone can open the same multi-view
-- **Cross-tab sync** — layouts, collections and favourites stay in step across every open tab
+- **Multi-stream playback**: open as many Twitch streams as you want side by side
+- **Flexible layouts**: switch between Grid and Focus (main stream + resizable sidebar) at any time
+- **Drag-and-drop reordering**: rearrange streams by dragging them within the grid
+- **Per-stream audio focus**: choose which stream plays audio while the rest stay muted
+- **Per-stream chat**: show the chat of any open stream in a side panel
+- **Unified chat**: merge every open channel into a single colour-coded feed, with emotes, read anonymously straight from Twitch IRC
+- **Live status**: open streams are polled for viewers and uptime, and tiles are flagged the moment a broadcast ends, with one click to clear them all
+- **Channel search**: search any Twitch channel from the home screen or the ⌘K command palette and add it instantly
+- **Category browsing**: browse top categories or search one (Just Chatting, GTA V…), filter its live streams by language, title or tag, star favourites, and add several streams at once; the panel sits beside the wall so streams keep playing
+- **Command palette**: press `⌘K` / `Ctrl+K` to add channels, reopen recent channels or saved walls, and run any action
+- **Saved walls**: name and save a whole multi-view setup, then restore it from the home screen or ⌘K
+- **Shareable links**: copy a link that encodes your current streams, layout and audio focus so anyone can open the same multi-view
+- **Keyboard shortcuts**: drive the whole multi-view from the keyboard; press `?` for the full list
+- **Cross-tab sync**: layouts, saved walls and recent channels stay in step across every open tab
 
 ---
 
@@ -29,11 +28,8 @@ A multi-stream viewer for Twitch. Watch several streams at once, rearrange them 
 | Layer       | Technology                                     |
 | ----------- | ---------------------------------------------- |
 | Frontend    | React 18, TypeScript, Vite, Tailwind CSS, SCSS |
-| Backend     | NestJS (Node.js), TypeScript                   |
-| Monorepo    | pnpm workspaces + Turborepo                    |
 | Drag & drop | dnd-kit                                        |
-| Auth        | Twitch OAuth 2.0 + short-lived JWT             |
-| HTTP        | Axios (client ↔ server ↔ Twitch Helix API)     |
+| Twitch data | Official embeds + Twitch's public GraphQL API  |
 
 ---
 
@@ -41,12 +37,8 @@ A multi-stream viewer for Twitch. Watch several streams at once, rearrange them 
 
 ```
 EmeraldCast/
-├── apps/
-│   ├── client/          # React frontend (Vite)
-│   └── server/          # NestJS API server
-└── packages/
-    ├── types/           # Shared TypeScript types
-    └── utils/           # Shared utility functions
+└── apps/
+    └── client/          # React app (Vite), the whole product
 ```
 
 ---
@@ -61,7 +53,7 @@ EmeraldCast/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/EmeraldCast.git
+git clone https://github.com/Zeikrom251/EmeraldCast.git
 cd EmeraldCast
 ```
 
@@ -71,61 +63,24 @@ cd EmeraldCast
 pnpm install
 ```
 
-### 3. Configure environment variables
-
-Create a `.env` file in `apps/server/` (or at the repo root if you prefer) with the following:
-
-```env
-# Twitch application credentials (https://dev.twitch.tv/console)
-TWITCH_CLIENT_ID=your_client_id
-TWITCH_CLIENT_SECRET=your_client_secret
-
-# OAuth redirect URI — must match what you registered on Twitch
-TWITCH_REDIRECT_URI=http://localhost:3001/api/twitch/auth/callback
-
-# Frontend origin for CORS
-FRONT_URL=http://localhost:5173
-
-# Server port
-PORT=3001
-
-# Secret used to sign the short-lived JWT returned after OAuth
-JWT_SECRET=change-this-in-production
-
-# Set to "true" only when the API runs behind a trusted reverse proxy, so the
-# rate limiter reads the real client IP instead of the proxy's
-TRUST_PROXY=false
-```
-
-You will need a Twitch application. Register one at the [Twitch Developer Console](https://dev.twitch.tv/console/apps) and add `http://localhost:3001/api/twitch/auth/callback` as a valid OAuth redirect URI.
-
-### 4. Run in development
+### 3. Run in development
 
 ```bash
 pnpm dev
 ```
 
-This starts both the client (`http://localhost:5173`) and the server (`http://localhost:3001`) in watch mode via Turborepo.
+This starts the app at `http://localhost:5173`. No environment variables or Twitch credentials are needed.
 
 ---
 
 ## How It Works
 
-The NestJS server acts as a thin, secure middleware layer between the browser and the Twitch Helix API. This keeps your `TWITCH_CLIENT_SECRET` out of the browser entirely.
+EmeraldCast is a static site that talks to Twitch directly from the browser:
 
-**OAuth flow:**
-
-1. User clicks "Connect Twitch" → browser is redirected to `/api/twitch/auth/login`
-2. Server builds the Twitch authorization URL and redirects the user
-3. Twitch redirects back to `/api/twitch/auth/callback` with a short-lived code
-4. Server exchanges the code for a user access token, fetches the user's followed channels, and signs a short-lived JWT
-5. Browser receives the JWT **in the URL fragment** (never in a query parameter or cookie) — it is never sent to any server
-6. The frontend decodes the payload, stores the data in React context, and immediately strips the token from the URL
-7. Twitch user tokens expire after about four hours; the server rotates them with the refresh token on the next followed-channels poll and hands the new pair back, and only asks the user to reconnect once that fails too
-
-**Twitch API budget:** every unauthenticated Helix read is cached server-side for 15–120 seconds depending on how fast the data moves, and simultaneous misses on the same key are coalesced into one upstream request, so a hundred viewers browsing the same category cost one call. Requests are additionally rate-limited per IP.
-
-**Unified chat** connects the browser directly to Twitch's IRC-over-WebSocket gateway with an anonymous `justinfan` login. It is read-only, needs no credentials, and never touches the API server.
+- **Players and single-channel chat** use Twitch's official embeds.
+- **Channel search, categories and live status** (viewers, uptime, offline detection) call `gql.twitch.tv`, the public GraphQL endpoint twitch.tv itself uses, with its public web Client-ID. It needs no secret and no login, but it is **unofficial and undocumented**: if Twitch changes it, search, categories and live status stop working while playback and chat keep going. All of it lives in `apps/client/src/lib/twitch.ts`.
+- **Unified chat** connects to Twitch's IRC-over-WebSocket gateway with an anonymous `justinfan` login. It is read-only and needs no credentials.
+- **Everything you save** (open streams, saved walls, recent channels) stays in `localStorage`.
 
 ---
 
@@ -135,10 +90,10 @@ Run these from the repo root:
 
 | Command       | Description                           |
 | ------------- | ------------------------------------- |
-| `pnpm dev`    | Start all apps in development mode    |
-| `pnpm build`  | Build all apps for production         |
-| `pnpm test`   | Run all test suites                   |
-| `pnpm lint`   | Lint all packages                     |
+| `pnpm dev`    | Start the app in development mode     |
+| `pnpm build`  | Build the app for production          |
+| `pnpm test`   | Run the test suite                    |
+| `pnpm lint`   | Lint the source                       |
 | `pnpm format` | Format all source files with Prettier |
 
 ---
