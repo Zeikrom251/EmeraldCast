@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { StreamStatus } from '@repo/types'
-import { api } from '../lib/api'
+import type { StreamStatus } from '../types'
+import { getStreamStatuses } from '../lib/twitch'
 import { useStream } from './StreamContext'
 import { StreamStatusContext } from './StreamStatusContext'
 
@@ -9,9 +9,9 @@ const POLL_INTERVAL_MS = 60_000
 /**
  * Keeps live state for the channels currently on the grid.
  *
- * The Twitch embed gives no usable signal when a broadcast ends — the iframe
- * just sits on a stale frame or an offline card — so the surrounding UI polls
- * Helix instead. Polling is paused while the tab is hidden and resumes with an
+ * The Twitch embed gives no usable signal when a broadcast ends: the iframe
+ * just sits on a stale frame or an offline card, so the surrounding UI polls
+ * Twitch instead. Polling is paused while the tab is hidden and resumes with an
  * immediate refresh on the way back, since that is exactly when the cached
  * state is most likely to be wrong.
  */
@@ -43,11 +43,11 @@ export function StreamStatusProvider({ children }: { children: ReactNode }) {
       const controller = new AbortController()
       inFlight = controller
       try {
-        const results = await api.twitch.streamStatus(logins, controller.signal)
+        const results = await getStreamStatuses(logins, controller.signal)
         if (disposed || controller.signal.aborted) return
         setStatuses(Object.fromEntries(results.map((s) => [s.login, s])))
       } catch {
-        // Network hiccup or an aborted poll — keep the last known state rather
+        // Network hiccup or an aborted poll: keep the last known state rather
         // than flashing every tile to "offline".
       }
     }
