@@ -1,4 +1,10 @@
-# EmeraldCast
+<p align="center">
+  <img src=".github/assets/banner.png" alt="EmeraldCast: all your streams, one screen" width="100%" />
+</p>
+
+<p align="center">
+  <a href="https://emeraldcast.vercel.app"><strong>Open EmeraldCast</strong></a>
+</p>
 
 A multi-stream viewer for Twitch. Watch several streams at once, rearrange them with drag-and-drop, and follow every chat in one merged feed, all from a single static page with no account and no backend.
 
