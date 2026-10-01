@@ -4,7 +4,7 @@ import { Home } from '../components/Home'
 import { StreamGrid } from '../components/StreamGrid'
 import { ChatPanel } from '../components/ChatPanel'
 import { CommandPalette } from '../components/CommandPalette'
-import { BrowsePanel } from '../components/Browse'
+import { BrowseModal } from '../components/Browse'
 import { ShortcutsOverlay } from '../components/ShortcutsOverlay'
 import { useStream } from '../context/StreamContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
@@ -36,19 +36,19 @@ export function WatchPage() {
       <main
         className={cn(
           'flex flex-1 gap-2 overflow-hidden',
-          (streams.length > 0 || browseOpen) && 'p-2'
+          streams.length > 0 && 'p-2'
         )}
       >
         {streams.length === 0 ? (
-          <Home onShowShortcuts={toggleShortcuts} onBrowse={toggleBrowse} compact={browseOpen} />
+          <Home onShowShortcuts={toggleShortcuts} onBrowse={toggleBrowse} />
         ) : (
           <>
             <StreamGrid />
             <ChatPanel />
           </>
         )}
-        {browseOpen && <BrowsePanel onClose={closeBrowse} />}
       </main>
+      {browseOpen && <BrowseModal onClose={closeBrowse} />}
       {paletteOpen && (
         <CommandPalette
           onClose={closePalette}

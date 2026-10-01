@@ -1,22 +1,11 @@
 import { useEffect, useState } from 'react'
-import {
-  Check,
-  ChevronLeft,
-  Compass,
-  Eye,
-  Filter,
-  ListChecks,
-  Loader2,
-  Plus,
-  Search,
-  Star,
-  X,
-} from 'lucide-react'
+import { Check, Compass, Eye, Filter, ListChecks, Loader2, Plus, Search, Star, X } from 'lucide-react'
 import { useStream } from '../../context/StreamContext'
 import { useFavoriteCategories } from '../../hooks/useFavoriteCategories'
 import { getCategoryStreams, getTopCategories, searchCategories } from '../../lib/twitch'
 import { cn, formatViewerCount } from '../../lib/utils'
 import type { CategoryStream, TwitchCategory } from '../../types'
+import { Kbd } from '../Kbd'
 import { LanguageSelect } from './LanguageSelect'
 
 const iconBtn =
@@ -26,7 +15,7 @@ const input =
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="mb-3 flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-muted)]">
+    <h3 className="mb-1.5 flex items-center gap-2 px-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-muted)]">
       {children}
     </h3>
   )
@@ -40,97 +29,82 @@ function Status({ children }: { children: React.ReactNode }) {
   )
 }
 
-function CategoryCard({
+function CategoryRow({
   category,
-  favorite,
+  active,
   onPick,
-  onToggleFavorite,
 }: {
   category: TwitchCategory
-  favorite: boolean
+  active: boolean
   onPick: () => void
-  onToggleFavorite: () => void
 }) {
   return (
-    <div className="group relative min-w-0">
-      <button onClick={onPick} className="block w-full text-left" title={`Browse ${category.name}`}>
-        <img
-          src={category.boxArtUrl}
-          alt=""
-          loading="lazy"
-          className="aspect-[3/4] w-full rounded-[10px] bg-[var(--bg-elevated)] object-cover outline outline-1 -outline-offset-1 outline-[var(--border-subtle)] transition group-hover:outline-2 group-hover:outline-[var(--accent)]"
-        />
-        <span className="mt-1.5 block truncate text-xs font-medium text-[var(--text-primary)]">
-          {category.name}
+    <button
+      onClick={onPick}
+      aria-current={active || undefined}
+      className={cn(
+        'relative flex h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left transition-colors',
+        active
+          ? 'bg-[var(--accent-tint)] text-[var(--accent)] before:absolute before:left-0 before:top-2.5 before:h-5 before:w-[3px] before:rounded-full before:bg-[var(--accent)]'
+          : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+      )}
+    >
+      <img
+        src={category.boxArtUrl}
+        alt=""
+        loading="lazy"
+        className="h-[30px] w-[22px] shrink-0 rounded bg-[var(--bg-elevated)] object-cover"
+      />
+      <span className={cn('min-w-0 flex-1 truncate text-[13px]', active ? 'font-semibold' : 'font-medium')}>
+        {category.name}
+      </span>
+      {category.viewerCount !== undefined && (
+        <span
+          className={cn(
+            'shrink-0 font-mono text-[11px]',
+            active ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'
+          )}
+        >
+          {formatViewerCount(category.viewerCount)}
         </span>
-        {category.viewerCount !== undefined && (
-          <span className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--text-muted)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--live-dot)]" />
-            {formatViewerCount(category.viewerCount)}
-          </span>
-        )}
-      </button>
-      <button
-        onClick={onToggleFavorite}
-        className={cn(
-          'absolute right-1.5 top-1.5 rounded-[7px] bg-[#050807]/60 p-1.5 backdrop-blur-md transition-opacity',
-          favorite
-            ? 'text-[#ffd166]'
-            : 'text-white opacity-0 focus:opacity-100 group-hover:opacity-100'
-        )}
-        title={favorite ? 'Remove from favorites' : 'Add to favorites'}
-        aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
-        aria-pressed={favorite}
-      >
-        <Star size={13} fill={favorite ? 'currentColor' : 'none'} />
-      </button>
-    </div>
+      )}
+    </button>
   )
 }
 
-function CategoryGrid({
+function CategoryRows({
   categories,
+  activeId,
   onPick,
 }: {
   categories: TwitchCategory[]
+  activeId?: string
   onPick: (category: TwitchCategory) => void
 }) {
-  const { isFavorite, toggleFavorite } = useFavoriteCategories()
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3">
+    <div className="space-y-0.5">
       {categories.map((c) => (
-        <CategoryCard
-          key={c.id}
-          category={c}
-          favorite={isFavorite(c.id)}
-          onPick={() => onPick(c)}
-          onToggleFavorite={() => toggleFavorite(c)}
-        />
+        <CategoryRow key={c.id} category={c} active={c.id === activeId} onPick={() => onPick(c)} />
       ))}
     </div>
   )
 }
 
-function CategoryList({
+function CategoryRail({
+  favorites,
+  top,
+  topFailed,
+  activeId,
   onPick,
-  onClose,
 }: {
+  favorites: TwitchCategory[]
+  top: TwitchCategory[] | null
+  topFailed: boolean
+  activeId?: string
   onPick: (category: TwitchCategory) => void
-  onClose: () => void
 }) {
-  const { favorites } = useFavoriteCategories()
   const [query, setQuery] = useState('')
-  const [top, setTop] = useState<TwitchCategory[] | null>(null)
   const [results, setResults] = useState<TwitchCategory[] | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    getTopCategories(controller.signal)
-      .then(setTop)
-      .catch(() => !controller.signal.aborted && setFailed(true))
-    return () => controller.abort()
-  }, [])
 
   useEffect(() => {
     const q = query.trim()
@@ -149,24 +123,24 @@ function CategoryList({
   }, [query])
 
   return (
-    <>
-      <div className="flex items-center gap-2.5 px-[18px] pb-3 pt-3.5">
+    <nav
+      className="flex max-h-[38%] shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[#090f0d] md:max-h-none md:w-60 md:border-b-0 md:border-r"
+      aria-label="Categories"
+    >
+      <div className="flex items-center gap-2.5 px-5 pb-3 pt-[18px]">
         <Compass size={16} className="text-[var(--accent)]" />
-        <h2 className="flex-1 font-display text-[17px] font-bold tracking-tight text-[var(--text-primary)]">
-          Browse categories
+        <h2 className="font-display text-[17px] font-bold tracking-tight text-[var(--text-primary)]">
+          Browse
         </h2>
-        <button onClick={onClose} className={iconBtn} aria-label="Close browser">
-          <X size={15} />
-        </button>
       </div>
-      <div className="px-[18px] pb-4">
-        <label className={input}>
-          <Search size={16} className="shrink-0 text-[var(--text-muted)]" />
+      <div className="px-4 pb-3">
+        <label className={cn(input, 'h-9')}>
+          <Search size={15} className="shrink-0 text-[var(--text-muted)]" />
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search categories: Just Chatting, GTA V…"
+            placeholder="Search categories"
             className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
           />
           {query && (
@@ -181,7 +155,7 @@ function CategoryList({
         </label>
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto px-[18px] pb-[18px]">
+      <div className="flex-1 space-y-5 overflow-y-auto px-2.5 pb-3">
         {query.trim() ? (
           results === null ? (
             <Status>
@@ -190,36 +164,40 @@ function CategoryList({
           ) : results.length === 0 ? (
             <Status>No category matches “{query.trim()}”.</Status>
           ) : (
-            <CategoryGrid categories={results} onPick={onPick} />
+            <CategoryRows categories={results} activeId={activeId} onPick={onPick} />
           )
         ) : (
           <>
             {favorites.length > 0 && (
               <section>
                 <SectionLabel>
-                  <Star size={12} className="text-[#ffd166]" fill="currentColor" /> Favorites
+                  <Star size={11} className="text-[#ffd166]" fill="currentColor" /> Favorites
                 </SectionLabel>
-                <CategoryGrid categories={favorites} onPick={onPick} />
+                <CategoryRows categories={favorites} activeId={activeId} onPick={onPick} />
               </section>
             )}
             <section>
               <SectionLabel>
                 <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" /> Top categories
               </SectionLabel>
-              {failed ? (
-                <Status>Couldn’t reach Twitch. Try again in a moment.</Status>
+              {topFailed ? (
+                <Status>Couldn’t reach Twitch.</Status>
               ) : top === null ? (
                 <Status>
-                  <Loader2 size={15} className="animate-spin" /> Loading what’s live…
+                  <Loader2 size={15} className="animate-spin" /> Loading…
                 </Status>
               ) : (
-                <CategoryGrid categories={top} onPick={onPick} />
+                <CategoryRows categories={top} activeId={activeId} onPick={onPick} />
               )}
             </section>
           </>
         )}
       </div>
-    </>
+
+      <div className="hidden items-center gap-2 border-t border-[var(--border-subtle)] px-5 py-3.5 text-xs text-[var(--text-muted)] md:flex">
+        <Kbd>Esc</Kbd> to close
+      </div>
+    </nav>
   )
 }
 
@@ -271,13 +249,13 @@ function StreamCard({
         ) : selectMode ? (
           <span
             className={cn(
-              'absolute right-2 top-2 flex h-[22px] w-[22px] items-center justify-center rounded-full',
+              'absolute right-2 top-2 flex h-[20px] w-[20px] items-center justify-center rounded-full',
               selected
                 ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
                 : 'border border-white/70 bg-[#050807]/60 text-transparent'
             )}
           >
-            <Check size={14} strokeWidth={3} />
+            <Check size={13} strokeWidth={3} />
           </span>
         ) : (
           <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
@@ -319,15 +297,16 @@ function StreamCard({
 
 function CategoryStreams({
   category,
-  onBack,
+  favorite,
+  onToggleFavorite,
   onClose,
 }: {
   category: TwitchCategory
-  onBack: () => void
+  favorite: boolean
+  onToggleFavorite: () => void
   onClose: () => void
 }) {
   const { streams: wall, addStream, addStreams } = useStream()
-  const { isFavorite, toggleFavorite } = useFavoriteCategories()
   const [language, setLanguage] = useState('')
   const [filter, setFilter] = useState('')
   const [streams, setStreams] = useState<CategoryStream[] | null>(null)
@@ -388,27 +367,26 @@ function CategoryStreams({
     })
   }
 
-  function addSelected() {
-    addStreams([...selected])
+  function exitSelectMode() {
     setSelected(new Set())
     setSelectMode(false)
   }
 
-  const favorite = isFavorite(category.id)
+  function addSelected() {
+    addStreams([...selected])
+    exitSelectMode()
+  }
 
   return (
-    <>
-      <div className="flex items-center gap-2.5 px-3.5 pb-3 pt-3.5">
-        <button
-          onClick={onBack}
-          className={cn(iconBtn, 'bg-[var(--bg-hover)]')}
-          aria-label="Back to categories"
-        >
-          <ChevronLeft size={15} />
-        </button>
-        <img src={category.boxArtUrl} alt="" className="h-10 w-[30px] rounded-md object-cover" />
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label={category.name}>
+      <div className="flex items-center gap-3.5 px-6 pb-4 pt-5">
+        <img
+          src={category.boxArtUrl}
+          alt=""
+          className="h-[46px] w-[34px] shrink-0 rounded-md bg-[var(--bg-elevated)] object-cover"
+        />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate font-display text-[17px] font-bold tracking-tight text-[var(--text-primary)]">
+          <h2 className="truncate font-display text-[22px] font-bold leading-tight tracking-tight text-[var(--text-primary)]">
             {category.name}
           </h2>
           {category.viewerCount !== undefined && (
@@ -419,19 +397,23 @@ function CategoryStreams({
           )}
         </div>
         <button
-          onClick={() => toggleFavorite(category)}
-          className={cn(iconBtn, favorite && 'text-[#ffd166] hover:text-[#ffd166]')}
+          onClick={onToggleFavorite}
+          className={cn(
+            iconBtn,
+            'p-2',
+            favorite && 'bg-[var(--bg-hover)] text-[#ffd166] hover:text-[#ffd166]'
+          )}
           aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
           aria-pressed={favorite}
         >
           <Star size={16} fill={favorite ? 'currentColor' : 'none'} />
         </button>
-        <button onClick={onClose} className={iconBtn} aria-label="Close browser">
-          <X size={15} />
+        <button onClick={onClose} className={cn(iconBtn, 'p-2')} aria-label="Close browser">
+          <X size={16} />
         </button>
       </div>
 
-      <div className="flex items-center gap-2 px-[18px] pb-3.5">
+      <div className="flex items-center gap-3 px-6 pb-4">
         <label className={cn(input, 'min-w-0 flex-1')}>
           <Filter size={14} className="shrink-0 text-[var(--text-muted)]" />
           <input
@@ -443,10 +425,7 @@ function CategoryStreams({
         </label>
         <LanguageSelect value={language} onChange={setLanguage} />
         <button
-          onClick={() => {
-            setSelectMode((on) => !on)
-            setSelected(new Set())
-          }}
+          onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
           aria-pressed={selectMode}
           className={cn(
             'flex h-10 shrink-0 items-center gap-2 rounded-[10px] border px-3 text-[13px] font-medium transition-colors',
@@ -461,7 +440,7 @@ function CategoryStreams({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-[18px] pb-[18px]">
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
         {failed ? (
           <Status>Couldn’t reach Twitch. Try again in a moment.</Status>
         ) : streams === null ? (
@@ -476,7 +455,7 @@ function CategoryStreams({
           </Status>
         ) : (
           <>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-x-[18px] gap-y-4">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-x-4 gap-y-5">
               {visible.map((s) => (
                 <StreamCard
                   key={s.login}
@@ -492,7 +471,7 @@ function CategoryStreams({
               <button
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-60"
+                className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-60"
               >
                 {loadingMore && <Loader2 size={14} className="animate-spin" />}
                 Load more
@@ -503,8 +482,8 @@ function CategoryStreams({
       </div>
 
       {selectMode && (
-        <div className="flex items-center gap-3 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-[18px] py-3">
-          <span className="text-[13px] font-medium text-[var(--text-primary)]">
+        <div className="flex items-center gap-3 border-t border-[var(--border-subtle)] px-6 py-4">
+          <span className="text-[13px] font-semibold text-[var(--text-primary)]">
             {selected.size} selected
           </span>
           <button
@@ -524,42 +503,98 @@ function CategoryStreams({
             </button>
           )}
           <button
+            onClick={exitSelectMode}
+            className="ml-auto h-9 rounded-[10px] border border-[var(--border-default)] px-4 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+          >
+            Cancel
+          </button>
+          <button
             onClick={addSelected}
             disabled={selected.size === 0}
-            className="ml-auto flex h-[38px] items-center gap-2 rounded-[10px] bg-[var(--accent)] px-4 text-[13px] font-semibold text-[var(--accent-ink)] transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-40"
+            className="flex h-9 items-center gap-2 rounded-[10px] bg-[var(--accent)] px-4 text-[13px] font-semibold text-[var(--accent-ink)] transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-40"
           >
             <Plus size={15} strokeWidth={2.5} />
             Add {selected.size || ''} stream{selected.size === 1 ? '' : 's'}
           </button>
         </div>
       )}
-    </>
+    </section>
   )
 }
 
 /**
- * Category browser. It sits beside the wall instead of over it: Twitch pauses
- * any player that something visible covers, so a modal would freeze every
- * stream for as long as it stayed open.
+ * Category browser, as a modal over the wall. Twitch pauses any player that
+ * something visible covers, so the streams behind it pause while it is open;
+ * the player keep-alive resumes them once it closes.
  */
-export function BrowsePanel({ onClose }: { onClose: () => void }) {
-  const [category, setCategory] = useState<TwitchCategory | null>(null)
+export function BrowseModal({ onClose }: { onClose: () => void }) {
+  const { favorites, isFavorite, toggleFavorite } = useFavoriteCategories()
+  const [picked, setPicked] = useState<TwitchCategory | null>(null)
+  const [top, setTop] = useState<TwitchCategory[] | null>(null)
+  const [topFailed, setTopFailed] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    getTopCategories(controller.signal)
+      .then(setTop)
+      .catch(() => !controller.signal.aborted && setTopFailed(true))
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !e.defaultPrevented) onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // Until the user picks one, open on their first favorite, else the top category.
+  const category = picked ?? favorites[0] ?? top?.[0] ?? null
 
   return (
-    <aside
-      className="flex w-[606px] max-w-[50vw] shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#030806]/75 p-4 backdrop-blur-[2px] md:p-8"
+      onMouseDown={onClose}
+      role="dialog"
+      aria-modal="true"
       aria-label="Browse categories"
-      onKeyDown={(e) => {
-        if (e.key !== 'Escape' || e.defaultPrevented) return
-        if (category) setCategory(null)
-        else onClose()
-      }}
     >
-      {category ? (
-        <CategoryStreams category={category} onBack={() => setCategory(null)} onClose={onClose} />
-      ) : (
-        <CategoryList onPick={setCategory} onClose={onClose} />
-      )}
-    </aside>
+      <div
+        className="flex h-full max-h-[772px] w-full max-w-[1120px] flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-[0_24px_64px_rgba(0,0,0,0.6)] md:flex-row"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <CategoryRail
+          favorites={favorites}
+          top={top}
+          topFailed={topFailed}
+          activeId={category?.id}
+          onPick={setPicked}
+        />
+        {category ? (
+          <CategoryStreams
+            key={category.id}
+            category={category}
+            favorite={isFavorite(category.id)}
+            onToggleFavorite={() => {
+              // Pin the view, so un-starring the default favorite doesn't jump away.
+              setPicked(category)
+              toggleFavorite(category)
+            }}
+            onClose={onClose}
+          />
+        ) : (
+          <div className="flex flex-1 items-center justify-center">
+            {topFailed ? (
+              <Status>Couldn’t reach Twitch. Try again in a moment.</Status>
+            ) : (
+              <Status>
+                <Loader2 size={15} className="animate-spin" /> Loading what’s live…
+              </Status>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

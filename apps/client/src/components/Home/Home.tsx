@@ -47,12 +47,9 @@ function Empty({ children }: { children: ReactNode }) {
 export function Home({
   onShowShortcuts,
   onBrowse,
-  compact,
 }: {
   onShowShortcuts: () => void
   onBrowse: () => void
-  /** The browse panel shares the row, so skip the decorative preview. */
-  compact: boolean
 }) {
   const { addStream, loadChannels } = useStream()
   const { walls, remove } = useSavedWalls()
@@ -176,10 +173,7 @@ export function Home({
           </div>
 
           <div
-            className={cn(
-              'hidden shrink-0 grid-cols-2 gap-1.5 rounded-[18px] border border-[var(--border-default)] bg-[var(--bg-surface)] p-1.5',
-              !compact && 'lg:grid'
-            )}
+            className="hidden shrink-0 grid-cols-2 gap-1.5 rounded-[18px] border border-[var(--border-default)] bg-[var(--bg-surface)] p-1.5 lg:grid"
             aria-hidden
           >
             {PREVIEW.map((background, i) => (

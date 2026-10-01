@@ -157,7 +157,7 @@ export async function getCategoryStreams(
   const data = await gql<{
     game: { streams: { edges: GqlCategoryStream[]; pageInfo: { hasNextPage: boolean } } } | null
   }>(
-    `query($id: ID!, $after: Cursor, $languages: [Language!]) { game(id: $id) {
+    `query($id: ID!, $after: Cursor, $languages: [String!]) { game(id: $id) {
       streams(first: 24, after: $after, options: { sort: VIEWER_COUNT, languages: $languages }) {
         edges { cursor node {
           title viewersCount previewImageURL(width: 440, height: 248) freeformTags { name }

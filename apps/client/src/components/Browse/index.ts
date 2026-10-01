@@ -1,1 +1,1 @@
-export { BrowsePanel } from './BrowsePanel'
+export { BrowseModal } from './BrowseModal'
