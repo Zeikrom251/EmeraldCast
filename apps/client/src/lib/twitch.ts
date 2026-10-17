@@ -1,5 +1,6 @@
 import type {
-  CategoryStreamsPage,
+  CategoryStream,
+  CategoryStreamList,
   StreamStatus,
   TwitchCategory,
   TwitchSearchResult,
@@ -138,7 +139,6 @@ export async function searchCategories(
 }
 
 interface GqlCategoryStream {
-  cursor: string
   node: {
     title: string
     viewersCount: number
@@ -148,43 +148,79 @@ interface GqlCategoryStream {
   }
 }
 
-/** One page of live streams in a category, most watched first. `language` is an ISO 639-1 code. */
-export async function getCategoryStreams(
-  categoryId: string,
-  opts: { cursor?: string | null; language?: string } = {},
-  signal?: AbortSignal
-): Promise<CategoryStreamsPage> {
-  const data = await gql<{
-    game: { streams: { edges: GqlCategoryStream[]; pageInfo: { hasNextPage: boolean } } } | null
-  }>(
-    `query($id: ID!, $after: Cursor, $languages: [String!]) { game(id: $id) {
-      streams(first: 24, after: $after, options: { sort: VIEWER_COUNT, languages: $languages }) {
-        edges { cursor node {
-          title viewersCount previewImageURL(width: 440, height: 248) freeformTags { name }
-          broadcaster { login displayName profileImageURL(width: 50) }
-        } }
-        pageInfo { hasNextPage }
-      }
-    } }`,
+const CATEGORY_STREAMS_QUERY = `query($id: ID!, $sort: StreamSort!, $languages: [String!], $tags: [String!]) { game(id: $id) {
+  streams(first: 100, options: { sort: $sort, languages: $languages, freeformTags: $tags }) {
+    edges { node {
+      title viewersCount previewImageURL(width: 440, height: 248) freeformTags { name }
+      broadcaster { login displayName profileImageURL(width: 50) }
+    } }
+    pageInfo { hasNextPage }
+  }
+} }`
+
+// Anonymous clients only get a category's first page: a request with an `after`
+// cursor fails with IntegrityCheckFailed, because paging needs a
+// Client-Integrity token that only twitch.tv itself can mint. Each sort order
+// still returns its own first 100 (the most `first` allows), so the most
+// watched, the least watched and the newest together reach far into the long
+// tail. RELEVANCE was measured to add next to nothing on top of these three.
+const CATEGORY_SORTS = ['VIEWER_COUNT', 'VIEWER_COUNT_ASC', 'RECENT']
+
+function toCategoryStream({ node }: GqlCategoryStream): CategoryStream[] {
+  // A banned broadcaster comes back as null.
+  if (!node.broadcaster) return []
+  return [
     {
-      id: categoryId,
-      after: opts.cursor ?? null,
-      languages: opts.language ? [opts.language.toUpperCase()] : null,
-    },
-    signal
-  )
-  const page = data.game?.streams
-  const edges = (page?.edges ?? []).filter((e) => e.node.broadcaster)
-  return {
-    streams: edges.map(({ node }) => ({
-      login: node.broadcaster!.login,
-      displayName: node.broadcaster!.displayName,
-      profileImageUrl: node.broadcaster!.profileImageURL,
+      login: node.broadcaster.login,
+      displayName: node.broadcaster.displayName,
+      profileImageUrl: node.broadcaster.profileImageURL,
       title: node.title,
       viewerCount: node.viewersCount,
       thumbnailUrl: node.previewImageURL,
       tags: (node.freeformTags ?? []).map((t) => t.name),
-    })),
-    cursor: page?.pageInfo.hasNextPage ? (edges[edges.length - 1]?.cursor ?? null) : null,
+    },
+  ]
+}
+
+/** Joins stream lists into one, most watched first, keeping a channel's first appearance. */
+export function mergeStreams(...lists: CategoryStream[][]): CategoryStream[] {
+  const byLogin = new Map<string, CategoryStream>()
+  for (const stream of lists.flat()) {
+    if (!byLogin.has(stream.login)) byLogin.set(stream.login, stream)
+  }
+  return [...byLogin.values()].sort((a, b) => b.viewerCount - a.viewerCount)
+}
+
+/**
+ * Live streams in a category, most watched first: as many as Twitch lists
+ * without paging. `complete` is false when the category holds more than that.
+ * `language` is an ISO 639-1 code. `tag` keeps only streams carrying that tag
+ * (Twitch matches it whole, ignoring case), searched across the entire
+ * category, so it reaches streams the unfiltered list can't.
+ */
+export async function getCategoryStreams(
+  categoryId: string,
+  opts: { language?: string; tag?: string } = {},
+  signal?: AbortSignal
+): Promise<CategoryStreamList> {
+  const languages = opts.language ? [opts.language.toUpperCase()] : null
+  const tags = opts.tag ? [opts.tag] : null
+  const results = await Promise.allSettled(
+    CATEGORY_SORTS.map((sort) =>
+      gql<{
+        game: {
+          streams: { edges: GqlCategoryStream[]; pageInfo: { hasNextPage: boolean } }
+        } | null
+      }>(CATEGORY_STREAMS_QUERY, { id: categoryId, sort, languages, tags }, signal)
+    )
+  )
+  const pages = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value.game?.streams] : []))
+  // One failed sort only costs some of the tail; all of them failing is an error.
+  if (pages.length === 0) throw (results[0] as PromiseRejectedResult).reason
+
+  return {
+    streams: mergeStreams(...pages.map((page) => (page?.edges ?? []).flatMap(toCategoryStream))),
+    // Any sort that fits on one page has seen the whole category.
+    complete: pages.some((page) => !page?.pageInfo.hasNextPage),
   }
 }

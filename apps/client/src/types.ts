@@ -50,7 +50,8 @@ export interface CategoryStream {
   tags: string[]
 }
 
-export interface CategoryStreamsPage {
+export interface CategoryStreamList {
   streams: CategoryStream[]
-  cursor: string | null
+  /** False when the category has more live streams than Twitch would list. */
+  complete: boolean
 }

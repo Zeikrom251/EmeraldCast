@@ -1,12 +1,33 @@
 import { useEffect, useState } from 'react'
-import { Check, Compass, Eye, Filter, ListChecks, Loader2, Plus, Search, Star, X } from 'lucide-react'
+import {
+  Check,
+  Compass,
+  Eye,
+  Filter,
+  ListChecks,
+  Loader2,
+  Plus,
+  Search,
+  Star,
+  X,
+} from 'lucide-react'
 import { useStream } from '../../context/StreamContext'
 import { useFavoriteCategories } from '../../hooks/useFavoriteCategories'
-import { getCategoryStreams, getTopCategories, searchCategories } from '../../lib/twitch'
+import {
+  getCategoryStreams,
+  getTopCategories,
+  mergeStreams,
+  searchCategories,
+} from '../../lib/twitch'
 import { cn, formatViewerCount } from '../../lib/utils'
 import type { CategoryStream, TwitchCategory } from '../../types'
 import { Kbd } from '../Kbd'
 import { LanguageSelect } from './LanguageSelect'
+
+/** Stream cards revealed per "Load more". */
+const PAGE_SIZE = 24
+/** What a Twitch tag can be: one run of letters and digits. */
+const TAG_PATTERN = /^[\p{L}\p{N}]{1,25}$/u
 
 const iconBtn =
   'rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
@@ -55,7 +76,12 @@ function CategoryRow({
         loading="lazy"
         className="h-[30px] w-[22px] shrink-0 rounded bg-[var(--bg-elevated)] object-cover"
       />
-      <span className={cn('min-w-0 flex-1 truncate text-[13px]', active ? 'font-semibold' : 'font-medium')}>
+      <span
+        className={cn(
+          'min-w-0 flex-1 truncate text-[13px]',
+          active ? 'font-semibold' : 'font-medium'
+        )}
+      >
         {category.name}
       </span>
       {category.viewerCount !== undefined && (
@@ -310,54 +336,64 @@ function CategoryStreams({
   const [language, setLanguage] = useState('')
   const [filter, setFilter] = useState('')
   const [streams, setStreams] = useState<CategoryStream[] | null>(null)
-  const [cursor, setCursor] = useState<string | null>(null)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [complete, setComplete] = useState(true)
+  const [shown, setShown] = useState(PAGE_SIZE)
   const [failed, setFailed] = useState(false)
+  const [tagged, setTagged] = useState<{ tag: string; streams: CategoryStream[] } | null>(null)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
 
-  // (Re)load the first page whenever the category or language changes.
+  // (Re)load whenever the category or language changes. Everything Twitch will
+  // list comes back at once, so the filter searches all of it and "Load more"
+  // only reveals more of what is already here.
   useEffect(() => {
     const controller = new AbortController()
     setStreams(null)
     setFailed(false)
+    setShown(PAGE_SIZE)
     getCategoryStreams(category.id, { language }, controller.signal)
-      .then((page) => {
-        setStreams(page.streams)
-        setCursor(page.cursor)
+      .then((list) => {
+        setStreams(list.streams)
+        setComplete(list.complete)
       })
       .catch(() => !controller.signal.aborted && setFailed(true))
     return () => controller.abort()
   }, [category.id, language])
 
-  async function loadMore() {
-    if (!cursor || loadingMore) return
-    setLoadingMore(true)
-    try {
-      const page = await getCategoryStreams(category.id, { cursor, language })
-      // Twitch pages by live viewer count, so a stream can move across a page
-      // boundary between requests; drop the repeats.
-      setStreams((prev) => {
-        const seen = new Set(prev?.map((s) => s.login))
-        return [...(prev ?? []), ...page.streams.filter((s) => !seen.has(s.login))]
-      })
-      setCursor(page.cursor)
-    } catch {
-      // keep what is loaded; the button stays so the user can retry
-    } finally {
-      setLoadingMore(false)
+  const q = filter.trim().toLowerCase()
+  const tag = TAG_PATTERN.test(q) ? q : ''
+
+  // The list above reaches only part of a big category, but Twitch can search a
+  // whole category by tag. So a filter that could be a tag is also sent as one,
+  // and what comes back joins the local matches.
+  useEffect(() => {
+    setTagged(null)
+    if (!tag) return
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => {
+      getCategoryStreams(category.id, { language, tag }, controller.signal)
+        .then((list) => setTagged({ tag, streams: list.streams }))
+        // The local matches still stand; the tag search only ever adds to them.
+        .catch(() => !controller.signal.aborted && setTagged({ tag, streams: [] }))
+    }, 300)
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
     }
-  }
+  }, [category.id, language, tag])
 
   const onWall = new Set(wall.map((s) => s.channel))
-  const q = filter.trim().toLowerCase()
-  const visible = (streams ?? []).filter(
+  const localMatches = (streams ?? []).filter(
     (s) =>
       !q ||
       s.title.toLowerCase().includes(q) ||
       s.displayName.toLowerCase().includes(q) ||
       s.tags.some((t) => t.toLowerCase().includes(q))
   )
+  const tagMatches = tag && tagged?.tag === tag ? tagged.streams : null
+  const visible = tagMatches ? mergeStreams(localMatches, tagMatches) : localMatches
+  const searchingTag = tag !== '' && !tagMatches
+  const page = visible.slice(0, shown)
 
   function toggle(login: string) {
     setSelected((prev) => {
@@ -418,7 +454,10 @@ function CategoryStreams({
           <Filter size={14} className="shrink-0 text-[var(--text-muted)]" />
           <input
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => {
+              setFilter(e.target.value)
+              setShown(PAGE_SIZE)
+            }}
             placeholder="Filter by title or tag"
             className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
           />
@@ -447,16 +486,22 @@ function CategoryStreams({
           <Status>
             <Loader2 size={15} className="animate-spin" /> Loading streams…
           </Status>
+        ) : visible.length === 0 && searchingTag ? (
+          <Status>
+            <Loader2 size={15} className="animate-spin" /> Searching Twitch for “{filter.trim()}”…
+          </Status>
         ) : visible.length === 0 ? (
           <Status>
-            {q
-              ? `No loaded stream matches “${filter.trim()}”.`
-              : `No one is live in ${category.name}${language ? ' in this language' : ''} right now.`}
+            {!q
+              ? `No one is live in ${category.name}${language ? ' in this language' : ''} right now.`
+              : complete
+                ? `No stream matches “${filter.trim()}”.`
+                : `No stream matches “${filter.trim()}” among the ${streams.length} Twitch lists here.`}
           </Status>
         ) : (
           <>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-x-4 gap-y-5">
-              {visible.map((s) => (
+              {page.map((s) => (
                 <StreamCard
                   key={s.login}
                   stream={s}
@@ -467,15 +512,22 @@ function CategoryStreams({
                 />
               ))}
             </div>
-            {cursor && (
+            {visible.length > shown ? (
               <button
-                onClick={loadMore}
-                disabled={loadingMore}
-                className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-60"
+                onClick={() => setShown((n) => n + PAGE_SIZE)}
+                className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
               >
-                {loadingMore && <Loader2 size={14} className="animate-spin" />}
                 Load more
+                <span className="font-mono text-[11px] text-[var(--text-muted)]">
+                  {visible.length - shown} left
+                </span>
               </button>
+            ) : (
+              !complete && (
+                <p className="mt-5 text-center text-xs text-[var(--text-muted)]">
+                  Twitch only lists {streams.length} of this category’s streams.
+                </p>
+              )
             )}
           </>
         )}
@@ -488,7 +540,7 @@ function CategoryStreams({
           </span>
           <button
             onClick={() =>
-              setSelected(new Set(visible.filter((s) => !onWall.has(s.login)).map((s) => s.login)))
+              setSelected(new Set(page.filter((s) => !onWall.has(s.login)).map((s) => s.login)))
             }
             className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
           >
