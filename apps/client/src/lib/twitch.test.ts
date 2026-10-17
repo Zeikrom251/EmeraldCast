@@ -79,39 +79,69 @@ describe('twitch gql', () => {
 })
 
 describe('getCategoryStreams', () => {
-  const edge = (login: string | null, cursor: string) => ({
-    cursor,
+  const edge = (login: string | null, viewersCount = 10) => ({
     node: {
       title: 't',
-      viewersCount: 10,
+      viewersCount,
       previewImageURL: 'https://x/p.jpg',
       freeformTags: [{ name: 'Français' }],
       broadcaster: login ? { login, displayName: login, profileImageURL: 'a' } : null,
     },
   })
-
-  it('returns the last cursor only when another page exists, skipping banned broadcasters', async () => {
-    mockGql({
-      game: {
-        streams: {
-          edges: [edge('a', 'c1'), edge(null, 'c2'), edge('b', 'c3')],
-          pageInfo: { hasNextPage: true },
-        },
-      },
-    })
-    const page = await getCategoryStreams('509658', { language: 'fr' })
-    expect(page.streams.map((s) => s.login)).toEqual(['a', 'b'])
-    expect(page.streams[0].tags).toEqual(['Français'])
-    expect(page.cursor).toBe('c3')
-    const body = JSON.parse(
-      (fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0][1]
-        .body as string
-    )
-    expect(body.variables.languages).toEqual(['FR'])
+  const page = (edges: ReturnType<typeof edge>[], hasNextPage = true) => ({
+    data: { game: { streams: { edges, pageInfo: { hasNextPage } } } },
   })
 
-  it('has no cursor on the last page', async () => {
-    mockGql({ game: { streams: { edges: [edge('a', 'c1')], pageInfo: { hasNextPage: false } } } })
-    expect((await getCategoryStreams('1')).cursor).toBeNull()
+  /** Answers each request by its sort order; a missing sort fails like a network error. */
+  function mockSorts(bySort: Record<string, unknown>) {
+    const fn = vi.fn(async (_url: string, init: RequestInit) => {
+      const { sort } = JSON.parse(init.body as string).variables
+      if (!(sort in bySort)) throw new TypeError('Failed to fetch')
+      return new Response(JSON.stringify(bySort[sort]), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fn)
+    return fn
+  }
+
+  it('merges every sort order, most watched first, without repeats or banned broadcasters', async () => {
+    const fetchMock = mockSorts({
+      VIEWER_COUNT: page([edge('top', 900), edge(null), edge('mid', 50)]),
+      VIEWER_COUNT_ASC: page([edge('tail', 0), edge('mid', 50)]),
+      RECENT: page([edge('new', 3)]),
+    })
+    const list = await getCategoryStreams('509658', { language: 'fr' })
+    expect(list.streams.map((s) => s.login)).toEqual(['top', 'mid', 'new', 'tail'])
+    expect(list.streams[0].tags).toEqual(['Français'])
+    expect(list.complete).toBe(false)
+    const variables = fetchMock.mock.calls.map(
+      ([, init]) => JSON.parse(init.body as string).variables
+    )
+    expect(variables.map((v) => v.sort)).toEqual(['VIEWER_COUNT', 'VIEWER_COUNT_ASC', 'RECENT'])
+    // Paging needs a token anonymous clients can't get, so no request may carry a cursor.
+    expect(variables.every((v) => v.languages[0] === 'FR' && !('after' in v))).toBe(true)
+    expect(variables.every((v) => v.tags === null)).toBe(true)
+  })
+
+  it('asks Twitch for a tag across the whole category', async () => {
+    const fetchMock = mockSorts({ VIEWER_COUNT: page([edge('a')], false) })
+    await getCategoryStreams('1', { tag: 'FlashbackWL' })
+    const { variables } = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    expect(variables.tags).toEqual(['FlashbackWL'])
+  })
+
+  it('is complete once any sort fits on a single page', async () => {
+    mockSorts({
+      VIEWER_COUNT: page([edge('a')], false),
+      VIEWER_COUNT_ASC: page([edge('a')], false),
+      RECENT: page([edge('a')], false),
+    })
+    expect(await getCategoryStreams('1')).toMatchObject({ complete: true })
+  })
+
+  it('keeps what the other sorts returned when one fails, and throws when all fail', async () => {
+    mockSorts({ VIEWER_COUNT: page([edge('a')]) })
+    expect((await getCategoryStreams('1')).streams.map((s) => s.login)).toEqual(['a'])
+    mockSorts({})
+    await expect(getCategoryStreams('1')).rejects.toThrow('Failed to fetch')
   })
 })
