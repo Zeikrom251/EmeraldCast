@@ -1,6 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { hasInteracted, onceInteracted } from '../../lib/interaction'
-import { registerPlayer } from '../../lib/twitchRegistry'
 import {
   X,
   GripVertical,
@@ -41,8 +40,6 @@ interface TwitchPlayerInstance {
   setVolume: (vol: number) => void
   play: () => void
   isPaused: () => boolean
-  addEventListener: (event: string, callback: () => void) => void
-  removeEventListener?: (event: string, callback: () => void) => void
 }
 
 interface TwitchEmbedInstance {
@@ -57,18 +54,17 @@ declare global {
         new (element: HTMLElement, options: Record<string, unknown>): TwitchEmbedInstance
         VIDEO_READY: string
       }
-      Player?: {
-        PLAY: string
-        PAUSE: string
-        PLAYING: string
-        PLAYBACK_BLOCKED: string
-      }
     }
   }
 }
 
 const TWITCH_EMBED_SRC = 'https://embed.twitch.tv/embed/v1.js'
 const DEFAULT_VOLUME = 0.5
+// The hover controls cover the iframe and Twitch pauses a covered player, so
+// they fade once the pointer rests. A resumed live stream continues from where
+// it paused: after a long pause it is far behind live, and Twitch's jump back
+// to the live edge can land past the buffered data and freeze it for good.
+const CONTROLS_IDLE_MS = 2000
 
 let embedScriptPromise: Promise<void> | null = null
 
@@ -115,7 +111,8 @@ export const StreamPlayer = memo(function StreamPlayer({
   const playerRef = useRef<TwitchPlayerInstance | null>(null)
   const mutedRef = useRef(muted)
   const nativeModeRef = useRef(nativeTwitchMode)
-  const hoveredRef = useRef(false)
+  const controlsShownRef = useRef(false)
+  const idleTimerRef = useRef<number>()
   const [ready, setReady] = useState(false)
   const [pendingUnmute, setPendingUnmute] = useState(false)
   // Controls are revealed by real pointer movement, not CSS :hover. A tile that
@@ -135,8 +132,6 @@ export const StreamPlayer = memo(function StreamPlayer({
     let cancelled = false
     let startupTimer: number | undefined
     let keepAliveTimer: number | undefined
-    let listenerPlayer: TwitchPlayerInstance | undefined
-    const listeners: Array<[string, () => void]> = []
 
     loadEmbedScript()
       .then(() => {
@@ -185,17 +180,18 @@ export const StreamPlayer = memo(function StreamPlayer({
             }
           }, 400)
 
-          // Persistent keep-alive. Beyond the initial autoplay gate, the stream
-          // can get paused later by things outside our control: a pre-roll ad
-          // ending, a rebuffer, or Twitch's visibility observer reacting to the
-          // hover controls overlapping the iframe. In EmeraldCast mode the user
-          // cannot pause deliberately (the iframe is pointer-events:none), so any
-          // pause is unintended and we resume it, but we skip while the tile is
-          // hovered, because the controls are on top of the video then and
-          // fighting that just rebuffers; the stream resumes the instant the
-          // pointer leaves.
+          // Persistent keep-alive. Beyond the initial autoplay gate, Twitch
+          // pauses the stream later on its own: a pre-roll ad ending, or its
+          // visibility observer reacting to the hover controls overlapping the
+          // iframe. A rebuffer is not one of them: isPaused() stays false while
+          // the player waits for data, so this never calls play() mid-stall.
+          // In EmeraldCast mode the user cannot pause deliberately (the iframe
+          // is pointer-events:none), so any pause is unintended and we resume
+          // it, but we skip while the controls are shown, because they are on
+          // top of the video then and fighting that just rebuffers; the stream
+          // resumes once they fade out.
           const resume = () => {
-            if (cancelled || nativeModeRef.current || hoveredRef.current) return
+            if (cancelled || nativeModeRef.current || controlsShownRef.current) return
             try {
               if (playerRef.current?.isPaused()) playerRef.current.play()
             } catch {
@@ -203,19 +199,6 @@ export const StreamPlayer = memo(function StreamPlayer({
             }
           }
           keepAliveTimer = window.setInterval(resume, 1500)
-
-          const wire = (event: string | undefined, handler: () => void) => {
-            if (!event) return
-            try {
-              listenerPlayer = player
-              listeners.push([event, handler])
-              player.addEventListener(event, handler)
-            } catch {
-              // embed build without this event constant: safe to skip
-            }
-          }
-          wire(window.Twitch?.Player?.PLAYBACK_BLOCKED, kick)
-          wire(window.Twitch?.Player?.PAUSE, resume)
 
           kick()
           setReady(true)
@@ -229,26 +212,11 @@ export const StreamPlayer = memo(function StreamPlayer({
       cancelled = true
       if (startupTimer !== undefined) window.clearInterval(startupTimer)
       if (keepAliveTimer !== undefined) window.clearInterval(keepAliveTimer)
-      if (listenerPlayer) {
-        for (const [event, handler] of listeners) {
-          listenerPlayer.removeEventListener?.(event, handler)
-        }
-      }
       playerRef.current = null
       setReady(false)
       container.replaceChildren()
     }
   }, [channel])
-
-  // Registers the player for cross-player coordination, independent of any
-  // mute-state bookkeeping so unregistration can never be lost.
-  useEffect(() => {
-    if (!ready) return
-    return registerPlayer(id, {
-      play: () => playerRef.current?.play(),
-      isPaused: () => playerRef.current?.isPaused() ?? false,
-    })
-  }, [ready, id])
 
   // Applies the mute state whenever it changes or the player becomes ready.
   // Unmuting before the first user interaction is deferred until one happens,
@@ -279,6 +247,12 @@ export const StreamPlayer = memo(function StreamPlayer({
   // Recomputed per render, which the status poll triggers every minute, the
   // same granularity the label is displayed at, so no extra timer is needed.
   const uptime = status?.isLive ? formatUptime(status.startedAt) : null
+
+  function hideControls() {
+    window.clearTimeout(idleTimerRef.current)
+    controlsShownRef.current = false
+    setShowControls(false)
+  }
 
   function handleOverlayClick() {
     if (!onAudioFocusSelect || isAudioFocus) return
@@ -324,14 +298,13 @@ export const StreamPlayer = memo(function StreamPlayer({
       className="group relative flex h-full flex-col overflow-hidden rounded-xl bg-black"
       data-controls={showControls || undefined}
       onMouseMove={() => {
-        if (hoveredRef.current) return
-        hoveredRef.current = true
+        window.clearTimeout(idleTimerRef.current)
+        idleTimerRef.current = window.setTimeout(hideControls, CONTROLS_IDLE_MS)
+        if (controlsShownRef.current) return
+        controlsShownRef.current = true
         setShowControls(true)
       }}
-      onMouseLeave={() => {
-        hoveredRef.current = false
-        setShowControls(false)
-      }}
+      onMouseLeave={hideControls}
     >
       {/* In Twitch mode the player owns the whole tile, so only the way back out is offered. */}
       {nativeTwitchMode && nativeToggle && (
